@@ -1,4 +1,3 @@
-﻿import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiConfig {
@@ -7,9 +6,7 @@ class ApiConfig {
   static final session = ValueNotifier<String?>(null);
   static String get baseUrl {
     const configured = String.fromEnvironment('API_BASE_URL');
-    final value = configured.isNotEmpty ? configured
-        : !kIsWeb && defaultTargetPlatform == TargetPlatform.android
-            ? 'http://10.0.2.2:8080' : 'http://localhost:8080';
+    final value = configured.isNotEmpty ? configured : 'https://backend-nhac.onrender.com';
     final semBarra = value.replaceFirst(RegExp(r'/+$'), '');
     // Os services já incluem /api/v1 em cada rota. Aceitar também uma
     // API_BASE_URL terminando em /api/v1 evita duplicar o prefixo no CI/E2E.

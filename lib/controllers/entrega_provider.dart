@@ -191,7 +191,9 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
   void _start() {
     if (!automatic || !_foreground || !cadastroAtivo) return;
-    _refreshTimer ??= Timer.periodic(const Duration(seconds: 30), (_) => sincronizar());
+    // A oferta tem prazo curto; a consulta periódica recupera mensagens
+    // perdidas quando o WebSocket cai ou o app volta ao primeiro plano.
+    _refreshTimer ??= Timer.periodic(const Duration(seconds: 10), (_) => sincronizar());
     _clock ??= Timer.periodic(const Duration(seconds: 1), (_) {
       if (_ofertas.isNotEmpty) { _ofertas.removeWhere((o) => o.expirada); _notify(); }
     });
