@@ -7,9 +7,17 @@ import 'controllers/entrega_provider.dart';
 import 'controllers/user_provider.dart';
 import 'globals/router.dart';
 import 'globals/theme_colors.dart';
+import 'services/api_config.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Restaura o token de sessão salvo (SharedPreferences) antes de montar o
+  // app: sem isso, appRouter.redirect (ver router.dart) avaliaria a rota
+  // inicial com ApiConfig.authToken ainda nulo mesmo que a pessoa já
+  // estivesse logada, e ela cairia sempre na tela de boas-vindas.
+  await ApiConfig.init();
+
   runApp(
     MultiProvider(
       providers: [

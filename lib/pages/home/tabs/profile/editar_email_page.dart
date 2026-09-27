@@ -56,7 +56,7 @@ class _EditarEmailPageState extends State<EditarEmailPage> {
       await Future.delayed(const Duration(milliseconds: 300));
       if (!mounted) return;
 
-      context.read<UserProvider>().atualizarEmail(_emailController.text.trim());
+      await context.read<UserProvider>().atualizarEmail(_emailController.text.trim());
 
       if (!mounted) return;
       context.showSuccess('E-mail alterado com sucesso!');

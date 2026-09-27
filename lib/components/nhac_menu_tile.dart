@@ -25,9 +25,8 @@ class _NhacMenuTileState extends State<NhacMenuTile> {
     setState(() => _isTapped = true);
     await widget.onTap();
     await Future.delayed(const Duration(milliseconds: 400));
-    if (mounted) {
-      setState(() => _isTapped = false);
-    }
+    if (!mounted) return;   // ✅ era context.mounted
+    setState(() => _isTapped = false);
   }
 
   @override

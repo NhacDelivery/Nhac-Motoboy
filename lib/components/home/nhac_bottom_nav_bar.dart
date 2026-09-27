@@ -63,6 +63,7 @@ class NhacBottomNavBar extends StatelessWidget {
     final isSelected = selectedIndex == index;
 
     return Semantics(
+      key: index == 1 ? const Key('historico-button') : null,
       button: true,
       label: label,
       selected: isSelected,

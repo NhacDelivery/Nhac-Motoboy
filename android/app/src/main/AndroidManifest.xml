@@ -1,4 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Permissões de localização para o GPS do motoboy (botão Online,
+         despacho por proximidade e rastreio da rota). Sem estas linhas
+         o geolocator lança PermissionDefinitionsNotFoundException e o
+         botão online nunca chega a chamar o backend. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Permissão de internet, usada por todas as chamadas HTTP ao backend -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:label="nhac_motoboy"
         android:name="${applicationName}"

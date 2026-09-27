@@ -10,6 +10,7 @@ import '../components/seta_voltar.dart';
 import '../controllers/cadastro_controller.dart';
 import '../globals/theme_colors.dart';
 import '../globals/ui_utils.dart';
+import '../services/auth_service.dart';
 import '../utils/validators.dart';
 
 class EmailMotocaPage extends StatefulWidget {
@@ -59,15 +60,42 @@ class _EmailMotocaPageState extends State<EmailMotocaPage> {
     super.dispose();
   }
 
+  final AuthService _authService = AuthService();
+
   Future<void> _avancarParaSenha() async {
     final email = _emailController.text.trim();
-    if (_emailValido) {
-      setState(() => _isLoading = true);
-      await Future.delayed(const Duration(milliseconds: 300));
+    if (!_emailValido) return;
+
+    setState(() => _isLoading = true);
+
+    // Antes disso, o botão "Continuar" só dava um delay fake de 300ms e
+    // navegava direto pra tela de senha, sem checar nada com o backend — o
+    // login por e-mail nunca chamava nenhuma API de verdade.
+    final cadastroController = context.read<CadastroController>();
+    cadastroController.setEmail(email);
+
+    try {
+      final existe = await _authService.checarEmail(email);
+      cadastroController.setEmailExiste(existe);
+
+      if (!existe) {
+        // E-mail novo: dispara o código de verificação já aqui, antes de
+        // navegar, pra tela seguinte já abrir com o código a caminho.
+        await _authService.enviarCodigoCadastro(email);
+      }
+
       if (!mounted) return;
       setState(() => _isLoading = false);
-      context.read<CadastroController>().setEmail(email);
-      context.push('/continuar-senha');
+
+      if (existe) {
+        context.push('/continuar-senha');
+      } else {
+        context.push('/criar-conta-codigo');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      context.showError(e.toString().replaceAll('Exception: ', ''));
     }
   }
 
@@ -76,8 +104,7 @@ class _EmailMotocaPageState extends State<EmailMotocaPage> {
     await Future.delayed(const Duration(seconds: 1));
     if (!mounted) return;
     setState(() => _isGoogleLoading = false);
-    context.showSuccess("Conectado com o Google!");
-    context.go('/home-motoca');
+    context.showInfo('Use seu e-mail ou telefone para entrar. O login Google ainda não está disponível.');
   }
 
   @override

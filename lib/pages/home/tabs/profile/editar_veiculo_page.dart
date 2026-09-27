@@ -2,213 +2,118 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-
 import '../../../../components/botoes/botao_largo_nhac.dart';
 import '../../../../components/nhac_input_field.dart';
-import '../../../../controllers/user_provider.dart';
+import '../../../../controllers/entrega_provider.dart';
 import '../../../../globals/theme_colors.dart';
 import '../../../../globals/ui_utils.dart';
+import '../../../../utils/validators.dart';
 
 class EditarVeiculoPage extends StatefulWidget {
   const EditarVeiculoPage({super.key});
-
   @override
   State<EditarVeiculoPage> createState() => _EditarVeiculoPageState();
 }
 
 class _EditarVeiculoPageState extends State<EditarVeiculoPage> {
-  late final TextEditingController _modeloController;
-  late final TextEditingController _placaController;
-  late final TextEditingController _corController;
-
-  bool _isLoading = false;
-  bool _formValido = false;
+  final _form = GlobalKey<FormState>();
+  late final TextEditingController _placa, _modelo, _cor;
+  late String _tipo;
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    final user = context.read<UserProvider>();
-    _modeloController = TextEditingController(text: user.veiculoModelo);
-    _placaController = TextEditingController(text: user.veiculoPlaca);
-    _corController = TextEditingController(text: user.veiculoCor);
-
-    _modeloController.addListener(_validar);
-    _placaController.addListener(_validar);
-    _corController.addListener(_validar);
-    _validar();
+    final profile = context.read<EntregaProvider>().perfilEntregador;
+    _placa = TextEditingController(text: profile?.placaVeiculo ?? '');
+    _modelo = TextEditingController(text: profile?.modeloVeiculo ?? '');
+    _cor = TextEditingController(text: profile?.corVeiculo ?? '');
+    _tipo = const ['MOTO', 'BICICLETA', 'CARRO'].contains(profile?.tipoVeiculo)
+        ? profile!.tipoVeiculo! : 'MOTO';
   }
 
   @override
   void dispose() {
-    _modeloController.removeListener(_validar);
-    _placaController.removeListener(_validar);
-    _corController.removeListener(_validar);
-    _modeloController.dispose();
-    _placaController.dispose();
-    _corController.dispose();
+    _placa.dispose(); _modelo.dispose(); _cor.dispose();
     super.dispose();
   }
 
-  void _validar() {
-    if (!mounted) return;
-    final modelo = _modeloController.text.trim();
-    final placa = _placaController.text.trim();
-
-    setState(() {
-      _formValido = modelo.isNotEmpty && placa.isNotEmpty;
-    });
-  }
-
-  Future<void> _salvarVeiculo() async {
+  Future<void> _save() async {
+    if (_saving || !_form.currentState!.validate()) return;
+    setState(() => _saving = true);
     try {
-      setState(() => _isLoading = true);
-      await Future.delayed(const Duration(milliseconds: 300));
+      await context.read<EntregaProvider>().atualizarVeiculo(
+        tipoVeiculo: _tipo,
+        placaVeiculo: _placa.text.trim().toUpperCase(),
+        modeloVeiculo: _modelo.text.trim(),
+        corVeiculo: _cor.text.trim(),
+      );
       if (!mounted) return;
-
-      context.read<UserProvider>().atualizarVeiculo(
-            modelo: _modeloController.text.trim(),
-            placa: _placaController.text.trim(),
-            cor: _corController.text.trim(),
-          );
-
-      if (!mounted) return;
-      context.showSuccess('Dados do veículo atualizados com sucesso!');
+      context.showSuccess('Veículo atualizado com sucesso!');
       context.pop();
     } catch (e) {
-      if (!mounted) return;
-      context.showError(e.toString());
+      if (mounted) context.showError(e.toString().replaceFirst('Bad state: ', ''));
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final emEntrega = context.watch<EntregaProvider>().emEntrega;
     return Scaffold(
       backgroundColor: AppColors.fundo,
-      appBar: AppBar(
-        backgroundColor: AppColors.fundo,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF5D201C), size: 20),
-          onPressed: () => context.pop(),
-        ),
-      ),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      appBar: AppBar(leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.texto),
+        onPressed: () => context.pop(),
+      )),
+      body: SafeArea(child: Form(key: _form, child: Column(children: [
+        Expanded(child: ListView(
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.symmetric(horizontal: 24.w),
           children: [
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 24.w),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(height: 16.h),
-                      Text(
-                        'Veículo & Moto',
-                        style: TextStyle(
-                          fontSize: 28.sp,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF5D201C),
-                          height: 1.2,
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                      SizedBox(height: 12.h),
-                      Text(
-                        'Atualize os dados da sua motocicleta para identificação nos estabelecimentos e nas entregas.',
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          color: Colors.grey.shade800,
-                          height: 1.5,
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                      SizedBox(height: 28.h),
-                      Text(
-                        'Modelo da Moto',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF5D201C),
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                      SizedBox(height: 8.h),
-                      NhacInputField(
-                        controller: _modeloController,
-                        textCapitalization: TextCapitalization.words,
-                        hintText: 'Ex: Honda CG 160 Fan',
-                        style: TextStyle(
-                          fontSize: 18.sp,
-                          color: const Color(0xFF5D201C),
-                          fontFamily: 'Roboto',
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      SizedBox(height: 20.h),
-                      Text(
-                        'Placa da Moto',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF5D201C),
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                      SizedBox(height: 8.h),
-                      NhacInputField(
-                        controller: _placaController,
-                        textCapitalization: TextCapitalization.characters,
-                        hintText: 'Ex: ABC-1234 ou BRA2E19',
-                        style: TextStyle(
-                          fontSize: 18.sp,
-                          color: const Color(0xFF5D201C),
-                          fontFamily: 'Roboto',
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      SizedBox(height: 20.h),
-                      Text(
-                        'Cor da Moto',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF5D201C),
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                      SizedBox(height: 8.h),
-                      NhacInputField(
-                        controller: _corController,
-                        textCapitalization: TextCapitalization.words,
-                        hintText: 'Ex: Vermelha, Preta, Azul',
-                        style: TextStyle(
-                          fontSize: 18.sp,
-                          color: const Color(0xFF5D201C),
-                          fontFamily: 'Roboto',
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.only(left: 24.w, right: 24.w, bottom: 32.h, top: 16.h),
-              child: BotaoLargoNhac(
-                texto: 'Salvar alterações',
-                carregando: _isLoading,
-                onPressed: _formValido ? _salvarVeiculo : null,
-              ),
-            ),
+            SizedBox(height: 16.h),
+            Text('Veículo & Moto', style: AppTextStyles.titulo()),
+            SizedBox(height: 12.h),
+            Text('Atualize os dados do veículo cadastrado para as entregas.', style: AppTextStyles.subtitulo()),
+            SizedBox(height: 28.h),
+            _label('Tipo de Veículo'), SizedBox(height: 8.h),
+            DropdownButtonFormField<String>(initialValue: _tipo,
+              decoration: const InputDecoration(filled: true, fillColor: Colors.white,
+                border: OutlineInputBorder()),
+              items: const [
+                DropdownMenuItem(value: 'MOTO', child: Text('Motocicleta')),
+                DropdownMenuItem(value: 'BICICLETA', child: Text('Bicicleta')),
+                DropdownMenuItem(value: 'CARRO', child: Text('Carro')),
+              ],
+              onChanged: _saving || emEntrega ? null : (value) => setState(() => _tipo = value!)),
+            SizedBox(height: 20.h),
+            _label('Modelo do Veículo'), SizedBox(height: 8.h),
+            NhacInputField(controller: _modelo, hintText: 'Ex: Honda CG 160 Fan',
+              textCapitalization: TextCapitalization.words,
+              validator: (v) => (v?.trim().length ?? 0) > 60 ? 'Máximo de 60 caracteres' : null),
+            SizedBox(height: 20.h),
+            _label('Placa do Veículo'), SizedBox(height: 8.h),
+            NhacInputField(controller: _placa, hintText: 'Ex: ABC-1234 ou BRA2E19',
+              textCapitalization: TextCapitalization.characters, validator: Validators.validarPlaca),
+            SizedBox(height: 20.h),
+            _label('Cor do Veículo'), SizedBox(height: 8.h),
+            NhacInputField(controller: _cor, hintText: 'Ex: Preta',
+              textCapitalization: TextCapitalization.words,
+              validator: (v) => (v?.trim().length ?? 0) > 30 ? 'Máximo de 30 caracteres' : null),
+            if (emEntrega) ...[
+              SizedBox(height: 20.h),
+              Text('Conclua a entrega atual antes de trocar de veículo.', style: AppTextStyles.subtitulo()),
+            ],
           ],
-        ),
-      ),
+        )),
+        Padding(padding: EdgeInsets.fromLTRB(24.w, 16.h, 24.w, 32.h),
+          child: BotaoLargoNhac(texto: 'Salvar alterações', carregando: _saving,
+            onPressed: _saving || emEntrega ? null : _save)),
+      ]))),
     );
   }
+
+  Widget _label(String text) => Text(text, style: TextStyle(fontFamily: 'Roboto',
+    fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.texto));
 }

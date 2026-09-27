@@ -1,3 +1,5 @@
+import 'status.dart';
+
 class EnderecoEntregaModel {
   final String? rua;
   final String? numero;
@@ -61,7 +63,7 @@ class EntregaAtivaModel {
   final double valorTotal;
   final double taxaFrete;
   final String formaPagamento;
-  final String statusPedido;
+  final StatusPedido statusPedido;
   final String? observacao;
 
   EntregaAtivaModel({
@@ -101,7 +103,7 @@ class EntregaAtivaModel {
       valorTotal: (json['valorTotal'] as num?)?.toDouble() ?? 0.0,
       taxaFrete: (json['taxaFrete'] as num?)?.toDouble() ?? 0.0,
       formaPagamento: json['formaPagamento']?.toString() ?? 'PIX',
-      statusPedido: json['statusPedido']?.toString() ?? 'SAIU_ENTREGA',
+      statusPedido: StatusPedido.parse(json['statusPedido']),
       observacao: json['observacao']?.toString(),
     );
   }

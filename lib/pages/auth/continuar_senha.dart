@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../components/botoes/botao_largo_nhac.dart';
 import '../../components/seta_voltar.dart';
+import '../../controllers/cadastro_controller.dart';
 import '../../globals/ui_utils.dart';
+import '../../services/api_config.dart';
+import '../../services/auth_service.dart';
 
 class ContinuarSenha extends StatefulWidget {
   const ContinuarSenha({super.key});
@@ -24,6 +28,7 @@ class _ContinuarSenhaState extends State<ContinuarSenha> {
   bool _senhaVisivel = false;
 
   final TextEditingController _senhaController = TextEditingController();
+  final AuthService _authService = AuthService();
 
   void _verificarSenha() {
     if (!mounted) {
@@ -42,17 +47,44 @@ class _ContinuarSenhaState extends State<ContinuarSenha> {
     super.dispose();
   }
 
+  /// Antes disto, este botão era 100% decorativo: um delay de 300ms e ia
+  /// direto pra home, sem nenhuma chamada ao backend. Qualquer senha, mesmo
+  /// errada, "logava com sucesso" — e como o token nunca era setado, toda
+  /// chamada de API autenticada depois disso saía sem Authorization.
   Future<void> logar() async {
-    setState(() => _isLoading = true);
+    final email = context.read<CadastroController>().email;
+    final senha = _senhaController.text;
 
-    // Transição visual sem validação de dados/backend
-    await Future.delayed(const Duration(milliseconds: 300));
+    if (email.isEmpty) {
+      setState(() => _errorMessage = 'Sessão expirada. Volte e informe o e-mail novamente.');
+      return;
+    }
+    if (senha.isEmpty) {
+      setState(() => _errorMessage = 'Digite sua senha.');
+      return;
+    }
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
-    context.showSuccess("Logado com sucesso!");
-    context.go('/home-motoca');
+    try {
+      final token = await _authService.login(email, senha);
+      await ApiConfig.setAuthToken(token);
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      context.showSuccess('Logado com sucesso!');
+      context.go('/home-motoca');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
+    }
   }
 
   @override
@@ -182,7 +214,7 @@ class _ContinuarSenhaState extends State<ContinuarSenha> {
                             label: 'Toque para recuperar sua senha',
                             child: GestureDetector(
                               onTap: () {
-                                context.showInfo('Recuperação de senha em breve.');
+                                context.push('/recuperar-senha');
                               },
                               child: const Text(
                                 'Esqueceu sua senha?',
@@ -206,7 +238,7 @@ class _ContinuarSenhaState extends State<ContinuarSenha> {
                             label: 'Toque para criar uma conta',
                             child: GestureDetector(
                               onTap: () {
-                                context.showInfo('Cadastro em breve.');
+                                context.push('/email-motoca');
                               },
                               child: const Text(
                                 'Não tem conta? Criar conta',

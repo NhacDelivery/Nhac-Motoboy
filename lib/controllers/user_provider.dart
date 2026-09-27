@@ -1,128 +1,91 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/user_service.dart';
+import '../services/api_config.dart';
 
-class UserProvider with ChangeNotifier {
-  String _usuarioId = 'motoca_001';
-  String _nome = 'Carlos da Silva';
-  String _email = 'carlos.motoca@nhac.com';
-  String _telefone = '(11) 98765-4321';
-  String _cpf = '123.456.789-00';
-  String _cnh = '12345678900';
-  String _veiculoModelo = 'Honda CG 160 Fan';
-  String _veiculoPlaca = 'ABC-1234';
-  String _veiculoCor = 'Vermelha';
-  String _tipoChavePix = 'CPF';
-  String _chavePix = '123.456.789-00';
-  String? _fotoPerfil;
-  bool _isLoading = false;
-
-  final int _entregas = 28;
-  final double _avaliacao = 4.9;
-  final double _ganhos = 342.00;
-
-  String get usuarioId => _usuarioId;
-  String get nome => _nome;
-  String get email => _email;
-  String get telefone => _telefone;
-  String get cpf => _cpf;
-  String get cnh => _cnh;
-  String get veiculoModelo => _veiculoModelo;
-  String get veiculoPlaca => _veiculoPlaca;
-  String get veiculoCor => _veiculoCor;
-  String get tipoChavePix => _tipoChavePix;
-  String get chavePix => _chavePix;
-  String? get fotoPerfil => _fotoPerfil;
-  bool get isLoading => _isLoading;
-  bool get hasPassword => true;
-
-  int get entregas => _entregas;
-  double get avaliacao => _avaliacao;
-  double get ganhos => _ganhos;
-
-  void setLoading(bool loading) {
-    _isLoading = loading;
-    notifyListeners();
+class UserProvider extends ChangeNotifier {
+  final UserService service;
+  UserProvider({UserService? service}) : service = service ?? UserService() {
+    ApiConfig.session.addListener(_sessionChanged);
   }
-
-  void atualizarNome(String novoNome) {
-    _nome = novoNome.trim();
-    notifyListeners();
+  String usuarioId = '', nome = '', email = '', telefone = '';
+  String? fotoPerfil, erro;
+  bool isLoading = false;
+  int _generation = 0;
+  bool _disposed = false;
+  void _sessionChanged() {
+    _generation++;
+    if (!ApiConfig.temSessaoSalva) limparUsuario();
   }
-
-  void atualizarEmail(String novoEmail) {
-    _email = novoEmail.trim();
-    notifyListeners();
+  Future<void> carregarDadosReais() async {
+    final generation = _generation;
+    isLoading = true; erro = null; notifyListeners();
+    try {
+      final data = await service.obterUsuario();
+      final id = data['id']?.toString() ?? '';
+      final prefs = await SharedPreferences.getInstance();
+      final localPath = id.isEmpty ? null : prefs.getString('motoboy_profile_photo_$id');
+      final localPhoto = localPath != null && await File(localPath).exists()
+          ? localPath : null;
+      if (_disposed || generation != _generation) return;
+      usuarioId = id; nome = data['nome'] ?? '';
+      email = data['email'] ?? ''; telefone = data['telefone'] ?? '';
+      fotoPerfil = localPhoto ?? data['imagemUrl'];
+    } catch (e) {
+      if (!_disposed && generation == _generation) erro = e.toString();
+    } finally {
+      if (!_disposed && generation == _generation) { isLoading = false; notifyListeners(); }
+    }
   }
-
-  void atualizarTelefone(String novoTelefone) {
-    _telefone = novoTelefone.trim();
-    notifyListeners();
+  Future<void> atualizarNome(String nome) => atualizar({'nome': nome.trim()});
+  Future<void> atualizarEmail(String email) => atualizar({'email': email.trim()});
+  Future<void> atualizarTelefone(String telefone) => atualizar({'telefone': telefone.trim()});
+  Future<void> atualizar(Map<String, dynamic> fields) async {
+    await service.atualizar(fields);
+    await carregarDadosReais();
   }
-
-  void atualizarDocumentos({required String cpf, required String cnh}) {
-    _cpf = cpf.trim();
-    _cnh = cnh.trim();
-    notifyListeners();
-  }
-
-  void atualizarVeiculo({
-    required String modelo,
-    required String placa,
-    required String cor,
-  }) {
-    _veiculoModelo = modelo.trim();
-    _veiculoPlaca = placa.trim().toUpperCase();
-    _veiculoCor = cor.trim();
-    notifyListeners();
-  }
-
-  void atualizarDadosBancarios({
-    required String tipo,
-    required String chave,
-  }) {
-    _tipoChavePix = tipo.trim();
-    _chavePix = chave.trim();
-    notifyListeners();
-  }
-
+  Future<void> atualizarSenha(String atual, String nova) => service.alterarSenha(atual, nova);
+  /// Mantém a foto somente neste aparelho; ainda não há upload de foto na API.
   Future<void> atualizarFotoPerfil(File imagem) async {
-    _fotoPerfil = imagem.path;
+    if (usuarioId.isEmpty) throw StateError('Carregue seu perfil antes de salvar a foto.');
+    final generation = _generation;
+    final owner = usuarioId;
+    final directory = await getApplicationSupportDirectory();
+    final safeId = owner.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    final destination = File(
+        '${directory.path}/nhac-profile-$safeId-${DateTime.now().microsecondsSinceEpoch}.jpg');
+    await imagem.copy(destination.path);
+    if (_disposed || generation != _generation || usuarioId != owner) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (_disposed || generation != _generation || usuarioId != owner) return;
+    final key = 'motoboy_profile_photo_$owner';
+    final previous = prefs.getString(key);
+    await prefs.setString(key, destination.path);
+    if (_disposed || generation != _generation || usuarioId != owner) return;
+    fotoPerfil = destination.path;
     notifyListeners();
+    if (previous != null &&
+        previous.startsWith('${directory.path}/nhac-profile-$safeId-') &&
+        previous != destination.path) {
+      try { await File(previous).delete(); } on FileSystemException { /* Foto anterior já removida. */ }
+    }
   }
-
-  void removerFotoPerfil() {
-    _fotoPerfil = null;
-    notifyListeners();
+  void setUsuario({String? id, String? nome, String? email, String? telefone, String? foto}) {
+    usuarioId = id ?? usuarioId; this.nome = nome ?? this.nome;
+    this.email = email ?? this.email; this.telefone = telefone ?? this.telefone;
+    fotoPerfil = foto ?? fotoPerfil; notifyListeners();
   }
-
-  void atualizarSenha(String novaSenha) {
-    // Simula atualização de senha
-    notifyListeners();
-  }
-
-  void setUsuario({
-    String? id,
-    String? nome,
-    String? email,
-    String? telefone,
-    String? foto,
-  }) {
-    if (id != null) _usuarioId = id;
-    if (nome != null) _nome = nome;
-    if (email != null) _email = email;
-    if (telefone != null) _telefone = telefone;
-    if (foto != null) _fotoPerfil = foto;
-    notifyListeners();
-  }
-
   void limparUsuario() {
-    _usuarioId = '';
-    _nome = '';
-    _email = '';
-    _telefone = '';
-    _cpf = '';
-    _cnh = '';
-    _fotoPerfil = null;
-    notifyListeners();
+    usuarioId = ''; nome = ''; email = ''; telefone = '';
+    fotoPerfil = null; erro = null; isLoading = false;
+    if (!_disposed) notifyListeners();
+  }
+  @override
+  void dispose() {
+    _disposed = true; _generation++;
+    ApiConfig.session.removeListener(_sessionChanged);
+    super.dispose();
   }
 }

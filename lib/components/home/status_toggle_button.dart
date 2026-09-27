@@ -4,11 +4,13 @@ import '../../globals/theme_colors.dart';
 
 class StatusToggleButton extends StatefulWidget {
   final bool estaOnline;
+  final bool carregando;
   final ValueChanged<bool> onChanged;
 
   const StatusToggleButton({
     super.key,
     required this.estaOnline,
+    this.carregando = false,
     required this.onChanged,
   });
 
@@ -47,7 +49,7 @@ class _StatusToggleButtonState extends State<StatusToggleButton>
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => widget.onChanged(!online),
+        onTap: widget.carregando ? null : () => widget.onChanged(!online),
         borderRadius: BorderRadius.circular(50.r),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 250),
@@ -75,12 +77,16 @@ class _StatusToggleButtonState extends State<StatusToggleButton>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Indicador com efeito pulsante quando online
               SizedBox(
                 width: 18.r,
                 height: 18.r,
                 child: Center(
-                  child: online
+                  child: widget.carregando
+                      ? CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.primaria,
+                        )
+                      : online
                       ? AnimatedBuilder(
                           animation: _pulseAnimation,
                           builder: (context, child) {
@@ -130,10 +136,11 @@ class _StatusToggleButtonState extends State<StatusToggleButton>
                       ? const Color(0xFF1B5E20)
                       : const Color(0xFF5D201C),
                 ),
-                child: Text(online ? 'DISPONÍVEL' : 'INDISPONÍVEL'),
+                child: Text(widget.carregando
+                    ? (online ? 'SAINDO...' : 'CONECTANDO...')
+                    : (online ? 'DISPONÍVEL' : 'INDISPONÍVEL')),
               ),
               SizedBox(width: 8.w),
-              // Mini switch visual integrado
               AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
                 width: 32.w,

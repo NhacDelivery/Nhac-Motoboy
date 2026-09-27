@@ -31,7 +31,7 @@ class _EditarFotoPageState extends State<EditarFotoPage> {
         imageQuality: 85,
       );
 
-      if (pickedFile != null) {
+      if (pickedFile != null && mounted) {
         setState(() {
           _image = File(pickedFile.path);
         });
@@ -94,9 +94,6 @@ class _EditarFotoPageState extends State<EditarFotoPage> {
 
     setState(() => _isLoading = true);
     try {
-      await Future.delayed(const Duration(milliseconds: 300));
-      if (!mounted) return;
-
       await context.read<UserProvider>().atualizarFotoPerfil(_image!);
 
       if (!mounted) return;
@@ -150,7 +147,7 @@ class _EditarFotoPageState extends State<EditarFotoPage> {
                       ),
                       SizedBox(height: 12.h),
                       Text(
-                        'Escolha uma foto clara com seu rosto para que clientes e restaurantes identifiquem você.',
+                        'Escolha uma foto para o seu perfil neste aparelho.',
                         style: TextStyle(
                           fontSize: 16.sp,
                           color: Colors.grey.shade800,
@@ -184,7 +181,9 @@ class _EditarFotoPageState extends State<EditarFotoPage> {
                                       : (currentFoto != null && currentFoto.isNotEmpty
                                           ? (currentFoto.startsWith('http')
                                               ? Image.network(currentFoto, fit: BoxFit.cover)
-                                              : Image.file(File(currentFoto), fit: BoxFit.cover))
+                                              : Image.file(File(currentFoto), fit: BoxFit.cover,
+                                                  errorBuilder: (_, _, _) => Icon(Icons.two_wheeler_rounded,
+                                                    size: 72.r, color: AppColors.primaria)))
                                           : Container(
                                               color: Colors.white,
                                               child: Icon(

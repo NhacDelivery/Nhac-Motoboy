@@ -1,4 +1,10 @@
 class OfertaEntregaModel {
+  int segundosEm(DateTime agora) {
+    final fim = DateTime.tryParse(expiraEm ?? '');
+    if (fim == null) return 0;
+    return (fim.difference(agora).inMilliseconds / 1000).ceil().clamp(0, 86400);
+  }
+  bool get expirada => segundosEm(DateTime.now()) == 0;
   final String id;
   final String pedidoId;
   final String lojaNome;
@@ -40,7 +46,7 @@ class OfertaEntregaModel {
       taxaFrete: (json['taxaFrete'] as num?)?.toDouble() ?? 0.0,
       criadoEm: json['criadoEm']?.toString(),
       expiraEm: json['expiraEm']?.toString(),
-      tempoRestanteSegundos: (json['tempoRestanteSegundos'] as num?)?.toInt() ?? 45,
+      tempoRestanteSegundos: (json['tempoRestanteSegundos'] as num?)?.toInt() ?? 0,
     );
   }
 

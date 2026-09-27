@@ -1,223 +1,86 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'package:provider/provider.dart';
-
 import '../../../../components/botoes/botao_largo_nhac.dart';
 import '../../../../components/nhac_input_field.dart';
-import '../../../../controllers/user_provider.dart';
+import '../../../../controllers/entrega_provider.dart';
 import '../../../../globals/theme_colors.dart';
 import '../../../../globals/ui_utils.dart';
 import '../../../../utils/validators.dart';
 
 class EditarDocumentosPage extends StatefulWidget {
   const EditarDocumentosPage({super.key});
-
   @override
   State<EditarDocumentosPage> createState() => _EditarDocumentosPageState();
 }
 
 class _EditarDocumentosPageState extends State<EditarDocumentosPage> {
-  late final TextEditingController _cpfController;
-  late final TextEditingController _cnhController;
-  late final MaskTextInputFormatter _cpfFormatter;
-  late final MaskTextInputFormatter _cnhFormatter;
-
-  bool _isLoading = false;
-  bool _formValido = false;
-  String? _erroCpf;
-  String? _erroCnh;
+  final _form = GlobalKey<FormState>();
+  late final TextEditingController _cpf, _cnh;
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    final user = context.read<UserProvider>();
-
-    _cpfFormatter = MaskTextInputFormatter(
-      mask: '###.###.###-##',
-      filter: {'#': RegExp(r'[0-9]')},
-      initialText: user.cpf,
-    );
-    _cnhFormatter = MaskTextInputFormatter(
-      mask: '###########',
-      filter: {'#': RegExp(r'[0-9]')},
-      initialText: user.cnh,
-    );
-
-    _cpfController = TextEditingController(text: _cpfFormatter.getMaskedText());
-    _cnhController = TextEditingController(text: _cnhFormatter.getMaskedText());
-
-    _cpfController.addListener(_validarCampos);
-    _cnhController.addListener(_validarCampos);
-    _validarCampos();
+    final profile = context.read<EntregaProvider>().perfilEntregador;
+    _cpf = TextEditingController(text: profile?.cpf ?? '');
+    _cnh = TextEditingController(text: profile?.cnh ?? '');
   }
 
   @override
-  void dispose() {
-    _cpfController.removeListener(_validarCampos);
-    _cnhController.removeListener(_validarCampos);
-    _cpfController.dispose();
-    _cnhController.dispose();
-    super.dispose();
-  }
+  void dispose() { _cpf.dispose(); _cnh.dispose(); super.dispose(); }
 
-  void _validarCampos() {
-    if (!mounted) return;
-    final cpf = _cpfController.text.trim();
-    final cnh = _cnhController.text.trim();
-
-    final erroCpfTemp = Validators.validarCPF(cpf);
-    String? erroCnhTemp;
-
-    if (cnh.isEmpty) {
-      erroCnhTemp = 'CNH obrigatória';
-    } else if (cnh.replaceAll(RegExp(r'\D'), '').length != 11) {
-      erroCnhTemp = 'A CNH deve ter 11 dígitos';
-    }
-
-    setState(() {
-      _erroCpf = cpf.isEmpty ? null : erroCpfTemp;
-      _erroCnh = cnh.isEmpty ? null : erroCnhTemp;
-      _formValido = erroCpfTemp == null &&
-          erroCnhTemp == null &&
-          cpf.isNotEmpty &&
-          cnh.isNotEmpty;
-    });
-  }
-
-  Future<void> _salvarDocumentos() async {
+  Future<void> _save() async {
+    if (_saving || !_form.currentState!.validate()) return;
+    setState(() => _saving = true);
     try {
-      setState(() => _isLoading = true);
-      await Future.delayed(const Duration(milliseconds: 300));
-      if (!mounted) return;
-
-      context.read<UserProvider>().atualizarDocumentos(
-            cpf: _cpfController.text.trim(),
-            cnh: _cnhController.text.trim(),
-          );
-
+      await context.read<EntregaProvider>().atualizarDocumentos(
+        cpf: _cpf.text.replaceAll(RegExp(r'\D'), ''),
+        cnh: _cnh.text.replaceAll(RegExp(r'\D'), ''),
+      );
       if (!mounted) return;
       context.showSuccess('Documentos atualizados com sucesso!');
       context.pop();
     } catch (e) {
-      if (!mounted) return;
-      context.showError(e.toString());
+      if (mounted) context.showError(e.toString().replaceFirst('Bad state: ', ''));
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.fundo,
-      appBar: AppBar(
-        backgroundColor: AppColors.fundo,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF5D201C), size: 20),
-          onPressed: () => context.pop(),
-        ),
-      ),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 24.w),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(height: 16.h),
-                      Text(
-                        'Documentos do Motoboy',
-                        style: TextStyle(
-                          fontSize: 28.sp,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF5D201C),
-                          height: 1.2,
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                      SizedBox(height: 12.h),
-                      Text(
-                        'Mantenha seu CPF e CNH atualizados para garantir a regularidade do seu cadastro como entregador.',
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          color: Colors.grey.shade800,
-                          height: 1.5,
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                      SizedBox(height: 28.h),
-                      Text(
-                        'CPF',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF5D201C),
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                      SizedBox(height: 8.h),
-                      NhacInputField(
-                        controller: _cpfController,
-                        inputFormatters: [_cpfFormatter],
-                        keyboardType: TextInputType.number,
-                        errorText: _erroCpf,
-                        hintText: '000.000.000-00',
-                        validator: Validators.validarCPF,
-                        style: TextStyle(
-                          fontSize: 18.sp,
-                          color: const Color(0xFF5D201C),
-                          fontFamily: 'Roboto',
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      SizedBox(height: 20.h),
-                      Text(
-                        'Número da CNH',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF5D201C),
-                          fontFamily: 'Roboto',
-                        ),
-                      ),
-                      SizedBox(height: 8.h),
-                      NhacInputField(
-                        controller: _cnhController,
-                        inputFormatters: [_cnhFormatter],
-                        keyboardType: TextInputType.number,
-                        errorText: _erroCnh,
-                        hintText: '11 dígitos da CNH',
-                        style: TextStyle(
-                          fontSize: 18.sp,
-                          color: const Color(0xFF5D201C),
-                          fontFamily: 'Roboto',
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.only(left: 24.w, right: 24.w, bottom: 32.h, top: 16.h),
-              child: BotaoLargoNhac(
-                texto: 'Salvar alterações',
-                carregando: _isLoading,
-                onPressed: _formValido ? _salvarDocumentos : null,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppColors.fundo,
+    appBar: AppBar(leading: IconButton(
+      icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.texto),
+      onPressed: () => context.pop())),
+    body: SafeArea(child: Form(key: _form, child: Column(children: [
+      Expanded(child: ListView(
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.symmetric(horizontal: 24.w),
+        children: [
+          SizedBox(height: 16.h),
+          Text('Documentos do Motoboy', style: AppTextStyles.titulo()),
+          SizedBox(height: 12.h),
+          Text('Mantenha CPF e CNH atualizados no seu cadastro de entregador.',
+            style: AppTextStyles.subtitulo()),
+          SizedBox(height: 28.h),
+          _label('CPF'), SizedBox(height: 8.h),
+          NhacInputField(controller: _cpf, keyboardType: TextInputType.number,
+            hintText: '000.000.000-00', validator: Validators.validarCPF),
+          SizedBox(height: 20.h),
+          _label('Número da CNH'), SizedBox(height: 8.h),
+          NhacInputField(controller: _cnh, keyboardType: TextInputType.number,
+            hintText: '11 dígitos da CNH', validator: Validators.validarCNH),
+        ],
+      )),
+      Padding(padding: EdgeInsets.fromLTRB(24.w, 16.h, 24.w, 32.h),
+        child: BotaoLargoNhac(texto: 'Salvar alterações', carregando: _saving,
+          onPressed: _saving ? null : _save)),
+    ]))),
+  );
+
+  Widget _label(String label) => Text(label, style: TextStyle(fontFamily: 'Roboto',
+    fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.texto));
 }

@@ -8,7 +8,9 @@ class CoordenadaModel {
   });
 
   factory CoordenadaModel.fromJson(Map<String, dynamic>? json) {
-    if (json == null) return const CoordenadaModel(latitude: 0, longitude: 0);
+    if (json == null || json['latitude'] is! num || json['longitude'] is! num) {
+      throw const FormatException('Coordenadas da rota indisponíveis.');
+    }
     return CoordenadaModel(
       latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
       longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
@@ -52,7 +54,7 @@ class RotaModel {
       destino: CoordenadaModel.fromJson(json['destino'] as Map<String, dynamic>?),
       distanciaMetros: (json['distanciaMetros'] as num?)?.toDouble() ?? 0.0,
       distanciaKm: (json['distanciaKm'] as num?)?.toDouble() ?? 0.0,
-      duracaoEstimadaMinutos: (json['duracaoEstimadaMinutos'] as num?)?.toInt() ?? 10,
+      duracaoEstimadaMinutos: (json['duracaoEstimadaMinutos'] as num?)?.toInt() ?? 0,
       polyline: json['polyline']?.toString() ?? '',
       waypoints: listaPontos,
     );

@@ -9,6 +9,7 @@ import '../../components/nhac_input_field.dart';
 import '../../components/seta_voltar.dart';
 import '../../controllers/cadastro_controller.dart';
 import '../../globals/theme_colors.dart';
+import '../../services/auth_service.dart';
 
 class InsiraTelefonePage extends StatefulWidget {
   const InsiraTelefonePage({super.key});
@@ -19,8 +20,11 @@ class InsiraTelefonePage extends StatefulWidget {
 
 class _InsiraTelefonePageState extends State<InsiraTelefonePage> {
   final TextEditingController _telefoneController = TextEditingController();
+  final AuthService _authService = AuthService();
+  
   bool _numeroValido = false;
   bool _isLoading = false;
+  String? _errorMessage;
 
   final maskFormatter = MaskTextInputFormatter(
     mask: '(##) #####-####',
@@ -38,20 +42,39 @@ class _InsiraTelefonePageState extends State<InsiraTelefonePage> {
     final apenasNumeros = maskFormatter.getUnmaskedText();
     setState(() {
       _numeroValido = apenasNumeros.length == 11;
+      if (_errorMessage != null) {
+        _errorMessage = null;
+      }
     });
   }
 
   Future<void> _avancar() async {
     if (!_numeroValido) return;
 
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    context.read<CadastroController>().setTelefone(_telefoneController.text.trim());
-    context.push('/verificacao-numero');
+      // Formata o telefone no padrão +55DDXXXXXXXXX
+      final telefoneFormatado = '+55${maskFormatter.getUnmaskedText()}';
+      
+      // Envia código de verificação por SMS
+      await _authService.enviarCodigoTelefone(telefoneFormatado);
+      
+      if (!mounted) return;
+      
+      context.read<CadastroController>().setTelefone(_telefoneController.text.trim());
+      context.push('/verificacao-numero');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -91,6 +114,30 @@ class _InsiraTelefonePageState extends State<InsiraTelefonePage> {
                         onChanged: _verificarNumero,
                         onFieldSubmitted: (_) => _avancar(),
                       ),
+                      if (_errorMessage != null)
+                        Padding(
+                          padding: EdgeInsets.only(top: 12.h),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                color: Colors.red,
+                                size: 16.r,
+                              ),
+                              SizedBox(width: 8.w),
+                              Expanded(
+                                child: Text(
+                                  _errorMessage!,
+                                  style: TextStyle(
+                                    color: Colors.red,
+                                    fontSize: 13.sp,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),

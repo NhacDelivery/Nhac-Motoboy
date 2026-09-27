@@ -66,5 +66,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>O Nhac usa sua localização para encontrar entregas próximas e acompanhar sua corrida enquanto o aplicativo está aberto.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>O Nhac usa a câmera para tirar sua foto de perfil.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>O Nhac acessa sua galeria para escolher uma foto de perfil.</string>
 </dict>
 </plist>

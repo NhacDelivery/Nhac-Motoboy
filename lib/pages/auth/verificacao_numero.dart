@@ -10,6 +10,8 @@ import '../../components/seta_voltar.dart';
 import '../../controllers/cadastro_controller.dart';
 import '../../globals/theme_colors.dart';
 import '../../globals/ui_utils.dart';
+import '../../services/auth_service.dart';
+import '../../services/api_config.dart';
 
 class VerificacaoNumeroPage extends StatefulWidget {
   const VerificacaoNumeroPage({super.key});
@@ -20,10 +22,13 @@ class VerificacaoNumeroPage extends StatefulWidget {
 
 class _VerificacaoNumeroPageState extends State<VerificacaoNumeroPage> {
   final TextEditingController _pinController = TextEditingController();
+  final AuthService _authService = AuthService();
+
   int _tempoRestante = 60;
   bool _podeReenviar = false;
   bool _codigoValido = false;
   bool _isLoading = false;
+  String? _errorMessage;
   Timer? _timer;
 
   @override
@@ -58,8 +63,25 @@ class _VerificacaoNumeroPageState extends State<VerificacaoNumeroPage> {
 
   void _reenviarCodigo() {
     if (!_podeReenviar) return;
-    _iniciarTimer();
-    context.showSuccess('Código reenviado com sucesso via SMS!');
+
+    try {
+      final telefone = context.read<CadastroController>().telefone;
+      final telefoneFormatado =
+          '+55${telefone.replaceAll(RegExp(r'[^0-9]'), '')}';
+
+      _authService.enviarCodigoTelefone(telefoneFormatado);
+      _iniciarTimer();
+
+      if (mounted) {
+        context.showSuccess('Código reenviado com sucesso via SMS!');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+        });
+      }
+    }
   }
 
   @override
@@ -72,14 +94,39 @@ class _VerificacaoNumeroPageState extends State<VerificacaoNumeroPage> {
   Future<void> _confirmarCodigo() async {
     if (!_codigoValido) return;
 
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+      final cadastroController = context.read<CadastroController>();
+      final telefone = cadastroController.telefone;
+      final telefoneFormatado =
+          '+55${telefone.replaceAll(RegExp(r'[^0-9]'), '')}';
+      final codigo = _pinController.text.trim();
 
-    context.showSuccess('Número verificado com sucesso!');
-    context.go('/home-motoca');
+      // Realiza login com SMS (ou cadastro se for primeiro acesso)
+      final token = await _authService.loginComSms(
+        telefone: telefoneFormatado,
+        codigo: codigo,
+      );
+
+      // Salva o token de autenticação (persistido em disco - ver ApiConfig.init())
+      await ApiConfig.setAuthToken(token);
+
+      if (!mounted) return;
+
+      context.showSuccess('Número verificado com sucesso!');
+      context.go('/cadastro-motoboy');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -102,10 +149,7 @@ class _VerificacaoNumeroPageState extends State<VerificacaoNumeroPage> {
                     children: [
                       const SetaVoltar(),
                       SizedBox(height: 20.h),
-                      Text(
-                        'Digite o código',
-                        style: AppTextStyles.titulo(),
-                      ),
+                      Text('Digite o código', style: AppTextStyles.titulo()),
                       SizedBox(height: 8.h),
                       Text(
                         telefone.isNotEmpty
@@ -170,6 +214,30 @@ class _VerificacaoNumeroPageState extends State<VerificacaoNumeroPage> {
                           ),
                         ),
                       ),
+                      if (_errorMessage != null)
+                        Padding(
+                          padding: EdgeInsets.only(top: 16.h),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                color: Colors.red,
+                                size: 16.r,
+                              ),
+                              SizedBox(width: 8.w),
+                              Expanded(
+                                child: Text(
+                                  _errorMessage!,
+                                  style: TextStyle(
+                                    color: Colors.red,
+                                    fontSize: 13.sp,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),

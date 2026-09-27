@@ -56,7 +56,7 @@ class _EditarNomePageState extends State<EditarNomePage> {
       await Future.delayed(const Duration(milliseconds: 300));
       if (!mounted) return;
 
-      context.read<UserProvider>().atualizarNome(_nameController.text);
+      await context.read<UserProvider>().atualizarNome(_nameController.text);
 
       if (!mounted) return;
       context.showSuccess('Nome atualizado com sucesso!');

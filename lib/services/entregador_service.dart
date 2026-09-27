@@ -1,133 +1,88 @@
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-
+import '../models/entregador_cadastro_model.dart';
 import '../models/entrega_ativa_model.dart';
 import '../models/oferta_entrega_model.dart';
 import '../models/rota_model.dart';
-import 'api_config.dart';
+import '../models/ganhos_entregador_model.dart';
+import '../models/historico_entrega_model.dart';
+import '../models/status.dart';
+import 'api_client.dart';
 
+/// Repositório HTTP do domínio de entregas. Ausência (404) e erro são distintos.
 class EntregadorService {
-  final http.Client _client;
-
-  EntregadorService({http.Client? client}) : _client = client ?? http.Client();
-
-  /// Altera o status operacional do motoboy no backend (ONLINE ou OFFLINE)
-  Future<bool> atualizarStatus(bool estaOnline) async {
-    final url = Uri.parse('${ApiConfig.baseUrl}/api/v1/entregador/status');
-    try {
-      final response = await _client.patch(
-        url,
-        headers: ApiConfig.headers,
-        body: jsonEncode({
-          'statusOperacional': estaOnline ? 'ONLINE' : 'OFFLINE',
-        }),
-      );
-
-      return response.statusCode == 200;
-    } catch (e) {
-      debugPrint('Erro ao atualizar status do entregador: $e');
-      return false;
-    }
+  final ApiClient api;
+  EntregadorService({http.Client? client, ApiClient? api}) : api = api ?? ApiClient(client: client);
+  Future<EntregadorCadastroModel> cadastrarEntregador({
+    required String cnh, required String placaVeiculo, required String tipoVeiculo,
+    required String cpf, String? corVeiculo, String? modeloVeiculo,
+  }) async => EntregadorCadastroModel.fromJson(await api.request('POST',
+    '/api/v1/entregador/cadastro', body: {'cnh': cnh, 'placaVeiculo': placaVeiculo,
+      'tipoVeiculo': tipoVeiculo, 'cpf': cpf,
+      'corVeiculo': ?corVeiculo,
+      'modeloVeiculo': ?modeloVeiculo}));
+  Future<EntregadorCadastroModel?> obterPerfil() async {
+    final data = await api.request('GET', '/api/v1/entregador/perfil', emptyStatuses: {404});
+    return data == null ? null : EntregadorCadastroModel.fromJson(data);
   }
-
-  /// Heartbeat periódico de GPS (envia latitude e longitude atuais)
-  Future<bool> enviarLocalizacao(double latitude, double longitude) async {
-    final url = Uri.parse('${ApiConfig.baseUrl}/api/v1/entregador/localizacao');
-    try {
-      final response = await _client.patch(
-        url,
-        headers: ApiConfig.headers,
-        body: jsonEncode({
-          'latitude': latitude,
-          'longitude': longitude,
-        }),
-      );
-
-      return response.statusCode == 200;
-    } catch (e) {
-      debugPrint('Erro ao enviar localização GPS: $e');
-      return false;
+  Future<EntregadorCadastroModel> atualizarVeiculo({required String tipoVeiculo,
+    required String placaVeiculo, String? modeloVeiculo, String? corVeiculo}) async =>
+      EntregadorCadastroModel.fromJson(await api.request('PATCH', '/api/v1/entregador/veiculo',
+        body: {'tipoVeiculo': tipoVeiculo, 'placaVeiculo': placaVeiculo,
+          'modeloVeiculo': modeloVeiculo, 'corVeiculo': corVeiculo}));
+  Future<EntregadorCadastroModel> atualizarDocumentos({required String cpf, required String cnh}) async =>
+      EntregadorCadastroModel.fromJson(await api.request('PATCH', '/api/v1/entregador/documentos',
+        body: {'cpf': cpf, 'cnh': cnh}));
+  Future<EntregadorCadastroModel> atualizarDadosBancarios({required String tipoChavePix,
+    required String chavePix}) async =>
+      EntregadorCadastroModel.fromJson(await api.request('PATCH', '/api/v1/entregador/dados-bancarios',
+        body: {'tipoChavePix': tipoChavePix, 'chavePix': chavePix}));
+  Future<EntregadorCadastroModel> atualizarStatus(StatusOperacional status) async {
+    if (status != StatusOperacional.online && status != StatusOperacional.offline) {
+      throw ArgumentError('O status é controlado pelo backend.');
     }
+    return EntregadorCadastroModel.fromJson(await api.request('PATCH',
+      '/api/v1/entregador/status', body: {'statusOperacional': status.api}));
   }
-
-  /// Consulta ofertas de corridas pendentes para o entregador logado
-  Future<List<OfertaEntregaModel>> buscarOfertasPendentes() async {
-    final url = Uri.parse('${ApiConfig.baseUrl}/api/v1/entregas/ofertas/pendentes');
-    try {
-      final response = await _client.get(url, headers: ApiConfig.headers);
-
-      if (response.statusCode == 200) {
-        final List<dynamic> dados = jsonDecode(utf8.decode(response.bodyBytes));
-        return dados.map((item) => OfertaEntregaModel.fromJson(item as Map<String, dynamic>)).toList();
-      }
-      return [];
-    } catch (e) {
-      debugPrint('Erro ao buscar ofertas pendentes: $e');
-      return [];
+  Future<void> enviarLocalizacao(double latitude, double longitude) async {
+    if (!latitude.isFinite || !longitude.isFinite || latitude.abs() > 90 || longitude.abs() > 180) {
+      throw ArgumentError('Localização inválida.');
     }
+    await api.request('PATCH', '/api/v1/entregador/localizacao',
+      body: {'latitude': latitude, 'longitude': longitude});
   }
-
-  /// Aceita uma oferta de entrega pendente
-  Future<EntregaAtivaModel?> aceitarOferta(String ofertaId) async {
-    final url = Uri.parse('${ApiConfig.baseUrl}/api/v1/entregas/ofertas/$ofertaId/aceitar');
-    try {
-      final response = await _client.post(url, headers: ApiConfig.headers);
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> dados = jsonDecode(utf8.decode(response.bodyBytes));
-        return EntregaAtivaModel.fromJson(dados);
-      }
-      return null;
-    } catch (e) {
-      debugPrint('Erro ao aceitar oferta: $e');
-      return null;
-    }
+  Future<List<OfertaEntregaModel>> buscarOfertasPendentes() async =>
+    ((await api.request('GET', '/api/v1/entregas/ofertas/pendentes')) as List)
+      .map((e) => OfertaEntregaModel.fromJson(e)).toList();
+  Future<EntregaAtivaModel> aceitarOferta(String id) async => EntregaAtivaModel.fromJson(
+    await api.request('POST', '/api/v1/entregas/ofertas/${Uri.encodeComponent(id)}/aceitar'));
+  Future<void> recusarOferta(String id) async {
+    await api.request('POST', '/api/v1/entregas/ofertas/${Uri.encodeComponent(id)}/recusar');
   }
-
-  /// Recusa uma oferta de corrida
-  Future<bool> recusarOferta(String ofertaId) async {
-    final url = Uri.parse('${ApiConfig.baseUrl}/api/v1/entregas/ofertas/$ofertaId/recusar');
-    try {
-      final response = await _client.post(url, headers: ApiConfig.headers);
-      return response.statusCode == 200 || response.statusCode == 204;
-    } catch (e) {
-      debugPrint('Erro ao recusar oferta: $e');
-      return false;
-    }
-  }
-
-  /// Obtém a entrega que o motoboy está realizando no momento
   Future<EntregaAtivaModel?> obterEntregaAtiva() async {
-    final url = Uri.parse('${ApiConfig.baseUrl}/api/v1/entregas/ativa');
+    final data = await api.request('GET', '/api/v1/entregas/ativa', emptyStatuses: {404});
+    return data == null ? null : EntregaAtivaModel.fromJson(data);
+  }
+  Future<RotaModel> obterRota(String id) async => RotaModel.fromJson(
+    await api.request('GET', '/api/v1/entregas/${Uri.encodeComponent(id)}/rota'));
+  Future<EntregaAtivaModel> coletarPedido(String id) async => EntregaAtivaModel.fromJson(
+    await api.request('POST', '/api/v1/entregas/${Uri.encodeComponent(id)}/coletar'));
+  Future<void> concluirEntrega(String id) async {
+    await api.request('POST', '/api/v1/entregas/${Uri.encodeComponent(id)}/concluir');
+  }
+  Future<HistoricoEntregasPagina> buscarHistorico({String? status, int page = 0, int size = 20}) async =>
+    HistoricoEntregasPagina.fromJson(await api.request('GET', '/api/v1/entregador/entregas',
+      query: {'page': '$page', 'size': '$size', 'status': ?status}));
+  Future<GanhosEntregadorModel?> buscarGanhos({String periodo = 'HOJE'}) async {
     try {
-      final response = await _client.get(url, headers: ApiConfig.headers);
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> dados = jsonDecode(utf8.decode(response.bodyBytes));
-        return EntregaAtivaModel.fromJson(dados);
-      }
-      return null;
-    } catch (e) {
-      debugPrint('Erro ao buscar entrega ativa: $e');
-      return null;
+      return GanhosEntregadorModel.fromJson(await api.request('GET',
+        '/api/v1/entregador/ganhos', query: {'periodo': periodo}));
+    } on ApiException catch (e) {
+      if (e.status == 404) throw EntregadorNaoCadastradoException();
+      rethrow;
     }
   }
-
-  /// Consulta a rota traçada com Polyline para o mapa
-  Future<RotaModel?> obterRota(String pedidoId) async {
-    final url = Uri.parse('${ApiConfig.baseUrl}/api/v1/entregas/$pedidoId/rota');
-    try {
-      final response = await _client.get(url, headers: ApiConfig.headers);
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> dados = jsonDecode(utf8.decode(response.bodyBytes));
-        return RotaModel.fromJson(dados);
-      }
-      return null;
-    } catch (e) {
-      debugPrint('Erro ao obter rota de entrega: $e');
-      return null;
-    }
-  }
+}
+class EntregadorNaoCadastradoException implements Exception {
+  @override
+  String toString() => 'Complete seu cadastro de entregador.';
 }

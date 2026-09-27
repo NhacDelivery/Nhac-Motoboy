@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 
 extension AppUiUtils on BuildContext {
+  /// Verifica se ainda dá pra usar o context antes de tocar no messenger.
+  /// Evita "Looking up a deactivated widget's ancestor is unsafe".
+  bool get _podeUsarUi => mounted;
+
   void showError(String message) {
-    ScaffoldMessenger.of(this).clearSnackBars();
-    ScaffoldMessenger.of(this).showSnackBar(
+    if (!_podeUsarUi) return;
+    final messenger = ScaffoldMessenger.maybeOf(this);
+    if (messenger == null) return;
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
       SnackBar(
         content: Text(
           message,
@@ -18,8 +25,11 @@ extension AppUiUtils on BuildContext {
   }
 
   void showSuccess(String message) {
-    ScaffoldMessenger.of(this).clearSnackBars();
-    ScaffoldMessenger.of(this).showSnackBar(
+    if (!_podeUsarUi) return;
+    final messenger = ScaffoldMessenger.maybeOf(this);
+    if (messenger == null) return;
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
       SnackBar(
         content: Text(
           message,
@@ -34,8 +44,11 @@ extension AppUiUtils on BuildContext {
   }
 
   void showInfo(String message) {
-    ScaffoldMessenger.of(this).clearSnackBars();
-    ScaffoldMessenger.of(this).showSnackBar(
+    if (!_podeUsarUi) return;
+    final messenger = ScaffoldMessenger.maybeOf(this);
+    if (messenger == null) return;
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
       SnackBar(
         content: Text(message),
         behavior: SnackBarBehavior.floating,

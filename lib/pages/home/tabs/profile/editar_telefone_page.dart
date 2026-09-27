@@ -63,7 +63,7 @@ class _EditarTelefonePageState extends State<EditarTelefonePage> {
       await Future.delayed(const Duration(milliseconds: 300));
       if (!mounted) return;
 
-      context.read<UserProvider>().atualizarTelefone(_phoneController.text.trim());
+      await context.read<UserProvider>().atualizarTelefone(_phoneController.text.trim());
 
       if (!mounted) return;
       context.showSuccess('Telefone atualizado com sucesso!');

@@ -88,7 +88,7 @@ class _EditarSenhaPageState extends State<EditarSenhaPage> {
       await Future.delayed(const Duration(milliseconds: 400));
       if (!mounted) return;
 
-      context.read<UserProvider>().atualizarSenha(_novaSenhaController.text);
+      await context.read<UserProvider>().atualizarSenha(_senhaAtualController.text, _novaSenhaController.text);
 
       if (!mounted) return;
       context.showSuccess('Senha alterada com sucesso!');
