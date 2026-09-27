@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../components/botoes/botao_largo_nhac.dart';
 import '../components/nhac_input_field.dart';
@@ -11,6 +12,7 @@ import '../controllers/cadastro_controller.dart';
 import '../globals/theme_colors.dart';
 import '../globals/ui_utils.dart';
 import '../services/auth_service.dart';
+import '../services/api_config.dart';
 import '../utils/validators.dart';
 
 class EmailMotocaPage extends StatefulWidget {
@@ -21,6 +23,7 @@ class EmailMotocaPage extends StatefulWidget {
 }
 
 class _EmailMotocaPageState extends State<EmailMotocaPage> {
+  static Future<void>? _googleInitialization;
   final TextEditingController _emailController = TextEditingController();
 
   bool _emailValido = false;
@@ -100,11 +103,27 @@ class _EmailMotocaPageState extends State<EmailMotocaPage> {
   }
 
   Future<void> _fazerLoginGoogle() async {
+    if (_isGoogleLoading) return;
     setState(() => _isGoogleLoading = true);
-    await Future.delayed(const Duration(seconds: 1));
-    if (!mounted) return;
-    setState(() => _isGoogleLoading = false);
-    context.showInfo('Use seu e-mail ou telefone para entrar. O login Google ainda não está disponível.');
+    try {
+      const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
+      if (webClientId.isEmpty) {
+        throw StateError('Login Google sem configuração. Informe GOOGLE_WEB_CLIENT_ID na compilação.');
+      }
+      final google = GoogleSignIn.instance;
+      _googleInitialization ??= google.initialize(serverClientId: webClientId);
+      await _googleInitialization;
+      final account = await google.authenticate();
+      final idToken = account.authentication.idToken;
+      if (idToken == null) throw StateError('O Google não retornou um token de identidade.');
+      final token = await _authService.loginComGoogle(idToken);
+      await ApiConfig.setAuthToken(token);
+      if (mounted) context.go('/home-motoca');
+    } catch (e) {
+      if (mounted) context.showError(e.toString().replaceFirst('Bad state: ', ''));
+    } finally {
+      if (mounted) setState(() => _isGoogleLoading = false);
+    }
   }
 
   @override

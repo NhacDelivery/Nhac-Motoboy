@@ -46,12 +46,6 @@ class _HomeMotocaPageState extends State<HomeMotocaPage> {
 
   Future<void> _alterarStatusOnline(bool online) async {
     final entrega = context.read<EntregaProvider>();
-    if (entrega.isSyncing) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Aguarde a sincronização terminar e tente novamente.'),
-      ));
-      return;
-    }
     await entrega.alternarStatusOnline(online);
     if (!mounted || entrega.estaOnline == online || entrega.emEntrega) return;
     final mensagem = entrega.erroLocalizacao ?? entrega.erro ??
@@ -61,6 +55,12 @@ class _HomeMotocaPageState extends State<HomeMotocaPage> {
       backgroundColor: Colors.redAccent,
       behavior: SnackBarBehavior.floating,
     ));
+  }
+  Future<void> _sair() async {
+    try { await context.read<EntregaProvider>().sair(); }
+    catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
   @override
@@ -89,7 +89,7 @@ class _HomeMotocaPageState extends State<HomeMotocaPage> {
           IconButton(
             tooltip: 'Sair da conta',
             icon: Icon(Icons.logout_rounded, color: AppColors.texto, size: 24.r),
-            onPressed: entrega.sair,
+            onPressed: _sair,
           ),
           SizedBox(width: 8.w),
         ],

@@ -60,7 +60,6 @@ class _EditarTelefonePageState extends State<EditarTelefonePage> {
   Future<void> _salvarTelefone() async {
     try {
       setState(() => _isLoading = true);
-      await Future.delayed(const Duration(milliseconds: 300));
       if (!mounted) return;
 
       await context.read<UserProvider>().atualizarTelefone(_phoneController.text.trim());

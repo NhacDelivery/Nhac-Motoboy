@@ -85,7 +85,6 @@ class _EditarSenhaPageState extends State<EditarSenhaPage> {
   Future<void> _processarAtualizacaoSenha() async {
     try {
       setState(() => _isLoading = true);
-      await Future.delayed(const Duration(milliseconds: 400));
       if (!mounted) return;
 
       await context.read<UserProvider>().atualizarSenha(_senhaAtualController.text, _novaSenhaController.text);

@@ -5,16 +5,26 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../globals/theme_colors.dart';
 import '../../models/rota_model.dart';
 
-class MapaRotaWidget extends StatelessWidget {
+class MapaRotaWidget extends StatefulWidget {
   final RotaModel rota;
   final double? latitude, longitude;
   const MapaRotaWidget({super.key, required this.rota, this.latitude, this.longitude});
   @override
+  State<MapaRotaWidget> createState() => _MapaRotaWidgetState();
+}
+
+class _MapaRotaWidgetState extends State<MapaRotaWidget> {
+  final MapController _controller = MapController();
+  @override
+  void dispose() { _controller.dispose(); super.dispose(); }
+  @override
   Widget build(BuildContext context) {
+    final rota = widget.rota;
     final origem = LatLng(rota.origem.latitude, rota.origem.longitude);
     final destino = LatLng(rota.destino.latitude, rota.destino.longitude);
     final points = rota.waypoints.map((p) => LatLng(p.latitude, p.longitude)).toList();
-    return SizedBox(height: 340, child: FlutterMap(
+    return SizedBox(height: 340, child: Stack(children: [FlutterMap(
+      mapController: _controller,
       key: ValueKey(rota.pedidoId),
       options: MapOptions(initialCameraFit: CameraFit.bounds(
         bounds: LatLngBounds.fromPoints([origem, destino]), padding: const EdgeInsets.all(48), maxZoom: 16)),
@@ -29,13 +39,20 @@ class MapaRotaWidget extends StatelessWidget {
         MarkerLayer(markers: [
           Marker(point: origem, child: Tooltip(message: 'Loja', child: Icon(Icons.store, color: AppColors.primaria, size: 36))),
           Marker(point: destino, child: Tooltip(message: 'Cliente', child: Icon(Icons.location_on, color: AppColors.texto, size: 36))),
-          if (latitude != null && longitude != null)
-            Marker(point: LatLng(latitude!, longitude!), child: Tooltip(message: 'Você', child: Icon(Icons.my_location, color: AppColors.desabilitado, size: 28))),
+          if (widget.latitude != null && widget.longitude != null)
+            Marker(point: LatLng(widget.latitude!, widget.longitude!), child: Tooltip(message: 'Você', child: Icon(Icons.my_location, color: AppColors.desabilitado, size: 28))),
         ]),
         RichAttributionWidget(attributions: [
           TextSourceAttribution('OpenStreetMap contributors', onTap: () => launchUrl(Uri.parse('https://www.openstreetmap.org/copyright'))),
         ]),
       ],
-    ));
+    ), if (widget.latitude != null && widget.longitude != null)
+      Positioned(right: 12, top: 12, child: FloatingActionButton.small(
+        heroTag: 'centralizar-motoboy',
+        tooltip: 'Centralizar na minha localização',
+        onPressed: () => _controller.move(LatLng(widget.latitude!, widget.longitude!), 16),
+        child: const Icon(Icons.my_location_rounded),
+      )),
+    ]));
   }
 }

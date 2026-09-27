@@ -53,7 +53,6 @@ class _EditarEmailPageState extends State<EditarEmailPage> {
   Future<void> _salvarEmail() async {
     try {
       setState(() => _isLoading = true);
-      await Future.delayed(const Duration(milliseconds: 300));
       if (!mounted) return;
 
       await context.read<UserProvider>().atualizarEmail(_emailController.text.trim());

@@ -123,7 +123,7 @@ class RotaEntregaPage extends StatelessWidget {
                           Padding(
                             padding: EdgeInsets.only(top: 8.h),
                             child: TextButton(
-                              onPressed: () => p.carregarRota(active.pedidoId),
+                              onPressed: () => p.carregarRota(active.pedidoId, tentarNovamente: true),
                               style: TextButton.styleFrom(foregroundColor: AppColors.primaria),
                               child: Text(p.erroRota == null ? 'Carregar mapa da corrida' : '${p.erroRota} Tentar novamente'),
                             ),
@@ -147,7 +147,7 @@ class RotaEntregaPage extends StatelessWidget {
                           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16.r),
                             border: Border.all(color: AppColors.bordaInativa)),
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text('Seu ganho no frete:', style: AppTextStyles.subtitulo()),
+                            Text('Frete calculado (repasse ainda não confirmado):', style: AppTextStyles.subtitulo()),
                             Text('R\$ ${active.taxaFrete.toStringAsFixed(2)}',
                               style: TextStyle(fontFamily: 'Roboto', fontSize: 20.sp, fontWeight: FontWeight.w800, color: const Color(0xFF2E7D32))),
                           ])),
@@ -186,6 +186,16 @@ class RotaEntregaPage extends StatelessWidget {
                                 context, MaterialPageRoute(builder: (_) => ChatPage(lojaId: active.lojaId!, lojaNome: active.lojaNome))),
                           ),
                         ],
+                        TextButton.icon(
+                          onPressed: () => showDialog<void>(context: context,
+                            builder: (dialogContext) => AlertDialog(
+                              title: const Text('Problema com a corrida?'),
+                              content: const Text('Converse com a loja para explicar o problema. A retirada da corrida requer atendimento e ainda não pode ser feita pelo aplicativo. Não confirme coleta ou entrega sem realizá-la.'),
+                              actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Entendi'))],
+                            )),
+                          icon: const Icon(Icons.help_outline),
+                          label: const Text('Não consigo realizar esta corrida'),
+                        ),
                         SizedBox(height: 20.h),
                         if (!p.entregaColetada)
                           BotaoLargoNhac(

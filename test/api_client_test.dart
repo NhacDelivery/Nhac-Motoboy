@@ -56,4 +56,24 @@ void main() {
     final auth = AuthService(client: MockClient((_) async => http.Response('{"existe":true}', 200)));
     expect(await auth.checarEmail('m@example.com'), true);
   });
+  test('timeout inclui a espera pela conexão inicial', () async {
+    final api = ApiClient(timeout: const Duration(milliseconds: 5),
+      client: MockClient((_) async {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        return http.Response('{}', 200);
+      }));
+    await expectLater(api.request('GET', '/perfil'), throwsA(isA<ApiException>()
+      .having((e) => e.status, 'status', 0)));
+  });
+  test('renovação de JWT do mesmo usuário mantém os providers ativos', () async {
+    String token(String nonce) => 'x.${base64Url.encode(utf8.encode(jsonEncode({'sub': 'motoboy-1', 'nonce': nonce})))}.y';
+    await ApiConfig.setAuthToken(token('old'));
+    var notifications = 0;
+    void listener() => notifications++;
+    ApiConfig.session.addListener(listener);
+    addTearDown(() => ApiConfig.session.removeListener(listener));
+    await ApiConfig.setAuthToken(token('new'));
+    expect(notifications, 0);
+    expect(ApiConfig.authToken, token('new'));
+  });
 }

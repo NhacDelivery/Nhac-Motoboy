@@ -147,7 +147,7 @@ class _EditarFotoPageState extends State<EditarFotoPage> {
                       ),
                       SizedBox(height: 12.h),
                       Text(
-                        'Escolha uma foto para o seu perfil neste aparelho.',
+                        'Escolha uma foto JPEG, PNG ou WEBP de até 5 MB. Ela será salva na sua conta.',
                         style: TextStyle(
                           fontSize: 16.sp,
                           color: Colors.grey.shade800,

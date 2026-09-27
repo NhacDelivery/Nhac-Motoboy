@@ -28,6 +28,7 @@ class _VerificacaoNumeroPageState extends State<VerificacaoNumeroPage> {
   bool _podeReenviar = false;
   bool _codigoValido = false;
   bool _isLoading = false;
+  bool _reenviando = false;
   String? _errorMessage;
   Timer? _timer;
 
@@ -61,17 +62,17 @@ class _VerificacaoNumeroPageState extends State<VerificacaoNumeroPage> {
     });
   }
 
-  void _reenviarCodigo() {
-    if (!_podeReenviar) return;
-
+  Future<void> _reenviarCodigo() async {
+    if (!_podeReenviar || _reenviando) return;
+    setState(() { _reenviando = true; _errorMessage = null; });
     try {
       final telefone = context.read<CadastroController>().telefone;
       final telefoneFormatado =
           '+55${telefone.replaceAll(RegExp(r'[^0-9]'), '')}';
 
-      _authService.enviarCodigoTelefone(telefoneFormatado);
+      await _authService.enviarCodigoTelefone(telefoneFormatado);
+      if (!mounted) return;
       _iniciarTimer();
-
       if (mounted) {
         context.showSuccess('Código reenviado com sucesso via SMS!');
       }
@@ -81,6 +82,8 @@ class _VerificacaoNumeroPageState extends State<VerificacaoNumeroPage> {
           _errorMessage = e.toString().replaceAll('Exception: ', '');
         });
       }
+    } finally {
+      if (mounted) setState(() => _reenviando = false);
     }
   }
 
@@ -118,7 +121,7 @@ class _VerificacaoNumeroPageState extends State<VerificacaoNumeroPage> {
       if (!mounted) return;
 
       context.showSuccess('Número verificado com sucesso!');
-      context.go('/cadastro-motoboy');
+      context.go('/home-motoca');
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -198,9 +201,9 @@ class _VerificacaoNumeroPageState extends State<VerificacaoNumeroPage> {
                       SizedBox(height: 20.h),
                       Center(
                         child: TextButton(
-                          onPressed: _podeReenviar ? _reenviarCodigo : null,
+                          onPressed: _podeReenviar && !_reenviando ? _reenviarCodigo : null,
                           child: Text(
-                            _podeReenviar
+                            _reenviando ? 'Enviando código…' : _podeReenviar
                                 ? 'Reenviar código por SMS'
                                 : 'Reenviar código em 00:${_tempoRestante.toString().padLeft(2, '0')}',
                             style: TextStyle(
