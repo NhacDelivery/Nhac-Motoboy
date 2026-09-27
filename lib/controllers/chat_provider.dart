@@ -19,6 +19,7 @@ class ChatProvider extends ChangeNotifier {
   bool loading = false, enviando = false, ultima = false, _disposed = false;
   bool _loadingHistory = false;
   bool _pendingHistoryReset = false;
+  Completer<void>? _historyCompletion;
   int _generation = 0;
   int _page = 0;
   Timer? _timeout;
@@ -83,8 +84,14 @@ class ChatProvider extends ChangeNotifier {
   }
   Future<void> carregar({bool reset = false}) async {
     if (conversaId == null || _disposed) return;
-    if (_loadingHistory) { if (reset) _pendingHistoryReset = true; return; }
+    if (_loadingHistory) {
+      if (reset) _pendingHistoryReset = true;
+      await _historyCompletion?.future;
+      return;
+    }
     _loadingHistory = true;
+    final completion = Completer<void>();
+    _historyCompletion = completion;
     final generation = _generation;
     final id = conversaId!;
     try {
@@ -100,9 +107,11 @@ class ChatProvider extends ChangeNotifier {
         _loadingHistory = false; _notify();
         if (_pendingHistoryReset) {
           _pendingHistoryReset = false;
-          unawaited(carregar(reset: true));
+          await carregar(reset: true);
         }
       }
+      completion.complete();
+      if (identical(_historyCompletion, completion)) _historyCompletion = null;
     }
   }
   Future<void> tentarNovamente(String loja) async {
