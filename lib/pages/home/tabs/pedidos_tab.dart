@@ -17,17 +17,38 @@ class _PedidosTabState extends State<PedidosTab> {
   final _service = EntregadorService();
   final List<HistoricoEntregaModel> _items = [];
   bool _loading = false, _last = false;
+  bool _pendingReload = false;
   int _page = 0;
   String? _error;
+  EntregaProvider? _entrega;
+  int _lastRevision = 0;
 
   @override
   void initState() {
     super.initState();
     _load(reset: true);
   }
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final provider = context.read<EntregaProvider>();
+    if (provider == _entrega) return;
+    _entrega?.removeListener(_onEntregaChanged);
+    _entrega = provider;
+    _lastRevision = provider.entregasConcluidasRevision;
+    provider.addListener(_onEntregaChanged);
+  }
+  void _onEntregaChanged() {
+    final revision = _entrega?.entregasConcluidasRevision ?? 0;
+    if (revision == _lastRevision) return;
+    _lastRevision = revision;
+    _load(reset: true);
+  }
+  @override
+  void dispose() { _entrega?.removeListener(_onEntregaChanged); super.dispose(); }
 
   Future<void> _load({bool reset = false}) async {
-    if (_loading) return;
+    if (_loading) { if (reset) _pendingReload = true; return; }
     setState(() { _loading = true; _error = null; });
     try {
       final page = await _service.buscarHistorico(page: reset ? 0 : _page);
@@ -41,7 +62,10 @@ class _PedidosTabState extends State<PedidosTab> {
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        if (_pendingReload) { _pendingReload = false; _load(reset: true); }
+      }
     }
   }
 
@@ -125,8 +149,8 @@ class _PedidosTabState extends State<PedidosTab> {
                 icone: Icons.storefront_rounded,
                 titulo: item.lojaNome ?? 'Loja',
                 subtitulo: '${item.status.label} • '
-                    '${[item.bairroEntrega, item.cidadeEntrega].whereType<String>().join(', ')}\n'
-                    '${item.entregueEm?.toLocal() ?? item.criadoEm?.toLocal() ?? ''}',
+                    '${_regiao(item)}\n${_formatarData(item.entregueEm ?? item.criadoEm)}',
+                onTap: () => _detalhes(item),
                 trailing: Text(
                   item.taxaFrete == null ? '—' : 'R\$ ${item.taxaFrete!.toStringAsFixed(2)}',
                   style: TextStyle(fontFamily: 'Roboto', fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.texto),
@@ -145,6 +169,40 @@ class _PedidosTabState extends State<PedidosTab> {
       ),
     );
   }
+  String _regiao(HistoricoEntregaModel item) {
+    final partes = [item.bairroEntrega, item.cidadeEntrega]
+        .whereType<String>().where((p) => p.trim().isNotEmpty);
+    return partes.isEmpty ? 'Região não informada' : partes.join(', ');
+  }
+  String _formatarData(DateTime? value) {
+    if (value == null) return 'Data não informada';
+    final date = value.toLocal();
+    String dois(int n) => n.toString().padLeft(2, '0');
+    return '${dois(date.day)}/${dois(date.month)}/${date.year} às ${dois(date.hour)}:${dois(date.minute)}';
+  }
+  void _detalhes(HistoricoEntregaModel item) => showModalBottomSheet<void>(
+    context: context, showDragHandle: true, isScrollControlled: true,
+    builder: (context) => SafeArea(child: Padding(
+      padding: EdgeInsets.all(24.r),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Detalhes da entrega', style: AppTextStyles.titulo()),
+        SizedBox(height: 16.h),
+        Text('Pedido #${item.pedidoId}', style: AppTextStyles.subtitulo()),
+        SizedBox(height: 12.h),
+        Text('Loja: ${item.lojaNome ?? 'Não informada'}'),
+        Text('Status: ${item.status.label}'),
+        Text('Região de entrega: ${_regiao(item)}'),
+        Text('Criado em: ${_formatarData(item.criadoEm)}'),
+        if (item.coletadoEm != null) Text('Coletado em: ${_formatarData(item.coletadoEm)}'),
+        if (item.entregueEm != null) Text('Concluído em: ${_formatarData(item.entregueEm)}'),
+        SizedBox(height: 12.h),
+        Text(item.taxaFrete == null ? 'Frete não informado' :
+          'Frete calculado: R\$ ${item.taxaFrete!.toStringAsFixed(2)}'),
+        SizedBox(height: 8.h),
+        Text('O histórico informa somente bairro e cidade, sem o endereço completo.', style: AppTextStyles.subtitulo()),
+      ]),
+    )),
+  );
 }
 
 class _CorridaCard extends StatelessWidget {

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../controllers/entrega_provider.dart';
 import '../../../controllers/user_provider.dart';
 import '../../../globals/theme_colors.dart';
+import '../../chat_page.dart';
 
 class PerfilTab extends StatelessWidget {
   const PerfilTab({super.key});
@@ -20,8 +21,7 @@ class PerfilTab extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(24.w, 16.h, 24.w, 120.h),
       children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          _CircleIcon(icon: Icons.notifications_none, onTap: () => ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Você não tem novas notificações.')))),
+          _CircleIcon(icon: Icons.notifications_none, onTap: () => _showNotices(context, delivery)),
           Text('Perfil', style: TextStyle(fontFamily: 'Roboto', fontSize: 18.sp,
               fontWeight: FontWeight.bold, color: AppColors.texto)),
           _CircleIcon(icon: Icons.more_horiz, onTap: () => _accountOptions(context, delivery)),
@@ -104,13 +104,13 @@ class PerfilTab extends StatelessWidget {
         _Section(children: [
           _AccountRow(icon: Icons.notifications_none, title: 'Notificações',
             subtitle: 'Preferências de avisos', onTap: () => context.push('/notificacoes')),
-          _AccountRow(icon: Icons.help_outline, title: 'Suporte & Ajuda',
-            subtitle: 'Dúvidas sobre o aplicativo', onTap: () => _showHelp(context)),
+          _AccountRow(icon: Icons.help_outline, title: 'Ajuda durante a entrega',
+            subtitle: 'Orientações e contato com a loja', onTap: () => _showHelp(context, delivery)),
           _AccountRow(icon: Icons.lock_outline, title: 'Alterar senha',
             subtitle: 'Atualizar senha da conta', onTap: () => context.push('/editar-senha')),
           _AccountRow(icon: Icons.logout, title: 'Sair da conta',
             subtitle: 'Desconectar deste celular', key: const Key('logout-button'),
-            onTap: delivery.sair),
+            onTap: () => _sair(context, delivery)),
         ]),
       ],
     ));
@@ -119,7 +119,30 @@ class PerfilTab extends StatelessWidget {
   Widget _sectionTitle(String title) => Text(title, style: TextStyle(
     fontFamily: 'Roboto', fontSize: 18.sp, fontWeight: FontWeight.bold, color: AppColors.texto));
 
-  void _showHelp(BuildContext context) => showModalBottomSheet(
+  Future<void> _sair(BuildContext context, EntregaProvider delivery) async {
+    try { await delivery.sair(); }
+    catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+  void _showNotices(BuildContext context, EntregaProvider delivery) => showModalBottomSheet<void>(
+    context: context, showDragHandle: true, builder: (ctx) => SafeArea(child: Padding(
+      padding: EdgeInsets.all(24.r), child: Column(mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _sectionTitle('Avisos recentes'), SizedBox(height: 12.h),
+          Text('Avisos recebidos enquanto o aplicativo está aberto.', style: AppTextStyles.subtitulo()),
+          SizedBox(height: 16.h),
+          if (delivery.avisosRecentes.isEmpty)
+            Text('Nenhuma oferta ou atualização de corrida recebida nesta sessão.', style: AppTextStyles.subtitulo()),
+          for (final aviso in delivery.avisosRecentes.take(5))
+            ListTile(leading: const Icon(Icons.notifications_active_outlined),
+              title: Text(aviso.texto), subtitle: Text(
+                '${aviso.hora.hour.toString().padLeft(2, '0')}:${aviso.hora.minute.toString().padLeft(2, '0')}')),
+        ])),
+    )),
+  );
+
+  void _showHelp(BuildContext context, EntregaProvider delivery) => showModalBottomSheet(
     context: context,
     backgroundColor: Colors.white,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24.r))),
@@ -133,6 +156,21 @@ class PerfilTab extends StatelessWidget {
         SizedBox(height: 12.h),
         Text('Os ganhos e o histórico de corridas ficam nas abas inferiores. Durante uma entrega, abra a rota pela home ou por Pedidos.',
           style: AppTextStyles.subtitulo()),
+        SizedBox(height: 12.h),
+        Text('Se não conseguir realizar uma corrida, converse com a loja antes da coleta. Após a coleta, preserve o pedido e combine uma solução com a loja; ainda não há retirada automática da corrida.',
+          style: AppTextStyles.subtitulo()),
+        if (delivery.entregaAtiva?.lojaId != null) ...[
+          SizedBox(height: 12.h),
+          FilledButton.icon(
+            onPressed: () {
+              final active = delivery.entregaAtiva!;
+              Navigator.pop(ctx);
+              Navigator.push(context, MaterialPageRoute(builder: (_) =>
+                ChatPage(lojaId: active.lojaId!, lojaNome: active.lojaNome)));
+            },
+            icon: const Icon(Icons.chat_outlined), label: const Text('Conversar com a loja'),
+          ),
+        ],
         SizedBox(height: 20.h),
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fechar')),
       ]),
@@ -149,7 +187,7 @@ class PerfilTab extends StatelessWidget {
           _sectionTitle('Opções da Conta'),
           SizedBox(height: 28.h),
           ListTile(leading: const Icon(Icons.logout), title: const Text('Sair da conta'),
-            onTap: () { Navigator.pop(ctx); delivery.sair(); }),
+            onTap: () { Navigator.pop(ctx); _sair(context, delivery); }),
           SizedBox(height: 24.h),
           SizedBox(width: double.infinity, child: FilledButton(
             onPressed: () => Navigator.pop(ctx), child: const Text('Voltar'))),

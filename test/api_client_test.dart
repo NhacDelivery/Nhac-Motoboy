@@ -56,4 +56,13 @@ void main() {
     final auth = AuthService(client: MockClient((_) async => http.Response('{"existe":true}', 200)));
     expect(await auth.checarEmail('m@example.com'), true);
   });
+  test('timeout inclui a espera pela conexão inicial', () async {
+    final api = ApiClient(timeout: const Duration(milliseconds: 5),
+      client: MockClient((_) async {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        return http.Response('{}', 200);
+      }));
+    await expectLater(api.request('GET', '/perfil'), throwsA(isA<ApiException>()
+      .having((e) => e.status, 'status', 0)));
+  });
 }

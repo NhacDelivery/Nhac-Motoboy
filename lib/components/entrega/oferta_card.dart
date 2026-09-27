@@ -30,7 +30,7 @@ class OfertaCard extends StatelessWidget {
               fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.primaria))),
           Stack(alignment: Alignment.center, children: [
             SizedBox(width: 36.r, height: 36.r, child: CircularProgressIndicator(
-              value: (seconds / 45).clamp(0.0, 1.0), strokeWidth: 3.5,
+              value: (seconds / 90).clamp(0.0, 1.0), strokeWidth: 3.5,
               backgroundColor: AppColors.bordaInativa.withValues(alpha: 0.3),
               color: seconds > 10 ? AppColors.primaria : const Color(0xFFD32F2F))),
             Text(expired ? '0' : '$seconds', style: TextStyle(fontFamily: 'Roboto',
@@ -38,7 +38,7 @@ class OfertaCard extends StatelessWidget {
           ]),
         ]),
         SizedBox(height: 18.h),
-        Text('Você recebe por esta entrega:', textAlign: TextAlign.center,
+        Text('Frete estimado desta entrega:', textAlign: TextAlign.center,
           style: TextStyle(fontFamily: 'Roboto', fontSize: 13.sp, color: AppColors.desabilitado)),
         Text('R\$ ${oferta.taxaFrete.toStringAsFixed(2)}', textAlign: TextAlign.center,
           style: TextStyle(fontFamily: 'Roboto', fontSize: 32.sp, fontWeight: FontWeight.w900,

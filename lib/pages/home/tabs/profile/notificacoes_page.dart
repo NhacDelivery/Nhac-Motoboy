@@ -67,7 +67,8 @@ class _NotificacoesPageState extends State<NotificacoesPage> {
         SizedBox(height: 16.h),
         Text('Notificações', style: AppTextStyles.titulo()),
         SizedBox(height: 12.h),
-        Text('Escolha quais avisos deseja receber.', style: AppTextStyles.subtitulo()),
+        Text('Estas preferências são salvas na conta. Ofertas e mensagens chegam em tempo real com o app aberto; avisos push em segundo plano ainda não estão disponíveis.',
+          style: AppTextStyles.subtitulo()),
         SizedBox(height: 28.h),
         if (_loading)
           const Center(child: CircularProgressIndicator(color: AppColors.primaria)),
