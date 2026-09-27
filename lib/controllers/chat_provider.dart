@@ -30,6 +30,7 @@ class ChatProvider extends ChangeNotifier {
     realtime.dispose();
     _timeout?.cancel();
     _generation++;
+    _loadingHistory = false;
     conversaId = null;
     mensagens.clear();
     enviando = false;
@@ -44,6 +45,7 @@ class ChatProvider extends ChangeNotifier {
   Future<void> abrir(String loja) async {
     final generation = ++_generation;
     realtime.dispose();
+    _loadingHistory = false; _pendingHistoryReset = false;
     mensagens.clear(); _page = 0; ultima = false;
     loading = true; erro = null; _notify();
     try {
@@ -66,7 +68,7 @@ class ChatProvider extends ChangeNotifier {
       realtime.onError = (message) { erro = message; _notify(); };
       realtime.connect();
       await carregar(reset: true);
-    } catch (e) { erro = e.toString(); }
+    } catch (e) { if (generation == _generation && !_disposed) erro = e.toString(); }
     finally { if (generation == _generation) { loading = false; _notify(); } }
   }
   void receber(MensagemModel m) {
@@ -92,12 +94,14 @@ class ChatProvider extends ChangeNotifier {
       for (final m in result.mensagens) { receber(m); }
       _page++; ultima = result.last;
       await service.marcarLida(id);
-    } catch (e) { erro = e.toString(); }
+    } catch (e) { if (generation == _generation && !_disposed) erro = e.toString(); }
     finally {
-      _loadingHistory = false; _notify();
-      if (_pendingHistoryReset && !_disposed) {
-        _pendingHistoryReset = false;
-        unawaited(carregar(reset: true));
+      if (generation == _generation && !_disposed) {
+        _loadingHistory = false; _notify();
+        if (_pendingHistoryReset) {
+          _pendingHistoryReset = false;
+          unawaited(carregar(reset: true));
+        }
       }
     }
   }

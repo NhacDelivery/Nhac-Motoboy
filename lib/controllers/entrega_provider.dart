@@ -181,6 +181,9 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
       _applyProfile(profile); _start();
     } catch (e) { if (_valid(epoch)) erro = e.toString(); }
     finally { if (_valid(epoch)) { _busy = false; _changingStatus = false; _notify(); } }
+    if (_valid(epoch) && !_foreground && estaOnline) {
+      await _ficarOffline();
+    }
     if (_valid(epoch) && _foreground) await sincronizar();
   }
   Future<bool> _ficarOffline() => _offlineOperation ??= _enviarOffline().whenComplete(() {

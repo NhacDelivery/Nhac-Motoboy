@@ -138,8 +138,7 @@ class PerfilTab extends StatelessWidget {
             ListTile(leading: const Icon(Icons.notifications_active_outlined),
               title: Text(aviso.texto), subtitle: Text(
                 '${aviso.hora.hour.toString().padLeft(2, '0')}:${aviso.hora.minute.toString().padLeft(2, '0')}')),
-        ])),
-    )),
+        ]))),
   );
 
   void _showHelp(BuildContext context, EntregaProvider delivery) => showModalBottomSheet(
