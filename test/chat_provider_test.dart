@@ -18,6 +18,7 @@ class _Realtime extends RealtimeService {
   final List<Map<String, dynamic>> sent = [];
   int reconnects = 0;
   @override bool get connected => true;
+  @override void listen(String topic, void Function(String) callback) {}
   @override void connect() { onConnected?.call(); }
   @override void reconnect() { reconnects++; onConnected?.call(); }
   @override void send(String destination, Map<String, dynamic> body) { sent.add(body); }
@@ -32,6 +33,7 @@ void main() {
     final provider = ChatProvider(service: service, realtime: realtime);
     addTearDown(provider.dispose);
     await provider.abrir('loja');
+    expect(provider.erro, isNull);
 
     expect(provider.enviar('Olá'), true);
     final first = realtime.sent.single['clientMessageId'] as String;
