@@ -44,6 +44,8 @@ void main() {
     expect(realtime.sent.last['clientMessageId'], isNot(first));
 
     await provider.tentarNovamente('loja');
+    // A recarga solicitada durante outra consulta é executada no ciclo seguinte.
+    await Future<void>.delayed(Duration.zero);
     expect(realtime.reconnects, 1);
     expect(service.historyCalls, greaterThanOrEqualTo(2));
   });
