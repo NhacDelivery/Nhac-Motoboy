@@ -56,9 +56,11 @@ void main() {
   });
   test('histórico interpreta paginação e status', () {
     final page = HistoricoEntregasPagina.fromJson({'content': [
-      {'pedidoId': 'p', 'status': 'CANCELADO', 'taxaFrete': 8}
+      {'pedidoId': 'p', 'status': 'CANCELADO', 'taxaFrete': 8,
+       'enderecoEntrega': {'rua': 'Rua A', 'numero': '12', 'bairro': 'Centro', 'cidade': 'Osasco'}}
     ], 'number': 2, 'totalPages': 4, 'last': false});
     expect(page.itens.single.status, StatusPedido.cancelado);
+    expect(page.itens.single.enderecoEntrega!.formatado, contains('Rua A, 12'));
     expect(page.paginaAtual, 2); expect(page.ultima, false);
   });
 }
