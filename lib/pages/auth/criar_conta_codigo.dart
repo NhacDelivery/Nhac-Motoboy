@@ -32,6 +32,7 @@ class _CriarContaCodigoPageState extends State<CriarContaCodigoPage> {
   bool _podeReenviar = false;
   bool _codigoValido = false;
   bool _isLoading = false;
+  bool _reenviando = false;
   String? _errorMessage;
   Timer? _timer;
 
@@ -62,7 +63,8 @@ class _CriarContaCodigoPageState extends State<CriarContaCodigoPage> {
   }
 
   Future<void> _reenviarCodigo() async {
-    if (!_podeReenviar) return;
+    if (!_podeReenviar || _reenviando) return;
+    setState(() => _reenviando = true);
     final email = context.read<CadastroController>().email;
     try {
       await _authService.enviarCodigoCadastro(email);
@@ -72,6 +74,8 @@ class _CriarContaCodigoPageState extends State<CriarContaCodigoPage> {
       if (mounted) {
         setState(() => _errorMessage = e.toString().replaceAll('Exception: ', ''));
       }
+    } finally {
+      if (mounted) setState(() => _reenviando = false);
     }
   }
 
@@ -174,14 +178,14 @@ class _CriarContaCodigoPageState extends State<CriarContaCodigoPage> {
                       SizedBox(height: 20.h),
                       Center(
                         child: TextButton(
-                          onPressed: _podeReenviar ? _reenviarCodigo : null,
+                          onPressed: _podeReenviar && !_reenviando ? _reenviarCodigo : null,
                           child: Text(
                             _podeReenviar
                                 ? 'Reenviar código por e-mail'
                                 : 'Reenviar código em 00:${_tempoRestante.toString().padLeft(2, '0')}',
                             style: TextStyle(
                               fontFamily: 'Roboto',
-                              color: _podeReenviar ? AppColors.primaria : AppColors.desabilitado,
+                            color: _podeReenviar && !_reenviando ? AppColors.primaria : AppColors.desabilitado,
                               fontSize: 15.sp,
                               fontWeight: FontWeight.w600,
                             ),
