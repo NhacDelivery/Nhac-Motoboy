@@ -1,5 +1,6 @@
 ﻿import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'api_config.dart';
 
@@ -15,7 +16,9 @@ class ApiException implements Exception {
 
 class ApiClient {
   final http.Client client;
-  ApiClient({http.Client? client}) : client = client ?? http.Client();
+  final Duration timeout;
+  ApiClient({http.Client? client, this.timeout = const Duration(seconds: 25)})
+      : client = client ?? http.Client();
   Future<dynamic> request(String method, String path, {
     Object? body, Map<String, String>? query, bool authenticated = true,
     Set<int> emptyStatuses = const {},
@@ -28,11 +31,13 @@ class ApiClient {
     if (body != null) request.body = jsonEncode(body);
     http.Response response;
     try {
-      response = await http.Response.fromStream(await client.send(request))
-          .timeout(const Duration(seconds: 25));
+      response = await (() async => http.Response.fromStream(await client.send(request)))()
+          .timeout(timeout);
     } on TimeoutException {
       throw const ApiException(0, 'A conexão demorou demais. Tente novamente.');
     } on http.ClientException {
+      throw const ApiException(0, 'Não foi possível conectar. Verifique sua internet.');
+    } on SocketException {
       throw const ApiException(0, 'Não foi possível conectar. Verifique sua internet.');
     }
     if (authenticated && token != ApiConfig.authToken) {

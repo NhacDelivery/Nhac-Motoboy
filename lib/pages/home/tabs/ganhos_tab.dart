@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:provider/provider.dart';
 
+import '../../../controllers/entrega_provider.dart';
 import '../../../globals/theme_colors.dart';
 import '../../../models/ganhos_entregador_model.dart';
 import '../../../services/entregador_service.dart';
@@ -40,12 +42,32 @@ class _GanhosTabState extends State<GanhosTab> {
   bool _naoEhEntregador = false;
   String? _erro;
   int _requestId = 0;
+  EntregaProvider? _entrega;
+  int _lastRevision = 0;
 
   @override
   void initState() {
     super.initState();
     _carregarGanhos();
   }
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final provider = context.read<EntregaProvider>();
+    if (provider == _entrega) return;
+    _entrega?.removeListener(_onEntregaChanged);
+    _entrega = provider;
+    _lastRevision = provider.entregasConcluidasRevision;
+    provider.addListener(_onEntregaChanged);
+  }
+  void _onEntregaChanged() {
+    final revision = _entrega?.entregasConcluidasRevision ?? 0;
+    if (revision == _lastRevision) return;
+    _lastRevision = revision;
+    _carregarGanhos();
+  }
+  @override
+  void dispose() { _entrega?.removeListener(_onEntregaChanged); super.dispose(); }
 
   Future<void> _carregarGanhos() async {
     final requestId = ++_requestId;
@@ -99,10 +121,10 @@ class _GanhosTabState extends State<GanhosTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Extrato & Carteira', style: AppTextStyles.titulo()),
+            Text('Frete das entregas', style: AppTextStyles.titulo()),
             SizedBox(height: 8.h),
             Text(
-              'Resumo dos seus repasses e corridas finalizadas',
+              'Valores brutos de frete das entregas concluídas. Pagamentos e repasses não são acompanhados aqui.',
               style: AppTextStyles.subtitulo(),
             ),
             SizedBox(height: 20.h),
@@ -209,7 +231,7 @@ class _GanhosTabState extends State<GanhosTab> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Ganhos (${_periodoSelecionado.rotulo.toLowerCase()})',
+                'Frete calculado (${_periodoSelecionado.rotulo.toLowerCase()})',
                 style: TextStyle(fontFamily: 'Roboto', fontSize: 14.sp, color: AppColors.desabilitado),
               ),
               SizedBox(height: 8.h),

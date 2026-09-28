@@ -119,12 +119,18 @@ class MotoboyInicio extends StatelessWidget {
             ),
             if (p.erroLocalizacao != null)
               _Notice(p.erroLocalizacao!, action: () => p.atualizarLocalizacao(solicitar: true)),
-            if (p.latitudeAtual != null) ...[
+            if (p.ultimaLocalizacaoEm != null) ...[
               SizedBox(height: 12.h),
               Row(children: [
-                Icon(Icons.gps_fixed_rounded, size: 18.r, color: AppColors.desabilitado),
+                Icon(p.localizacaoRecente ? Icons.gps_fixed_rounded : Icons.gps_off_rounded,
+                  size: 18.r, color: p.localizacaoRecente ? const Color(0xFF2E7D32) : Colors.orange.shade800),
                 SizedBox(width: 8.w),
-                Text('Localização atualizada', style: AppTextStyles.subtitulo()),
+                Expanded(child: Text(
+                  '${p.localizacaoRecente ? 'Localização enviada' : 'Localização desatualizada'} às '
+                  '${p.ultimaLocalizacaoEm!.toLocal().hour.toString().padLeft(2, '0')}:'
+                  '${p.ultimaLocalizacaoEm!.toLocal().minute.toString().padLeft(2, '0')}. '
+                  '${p.localizacaoRecente ? '' : 'Atualize o GPS para receber ofertas próximas.'}',
+                  style: AppTextStyles.subtitulo())),
               ]),
             ],
             if (p.estaOnline) ...[

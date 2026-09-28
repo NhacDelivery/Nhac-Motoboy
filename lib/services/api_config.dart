@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiConfig {
@@ -23,8 +25,18 @@ class ApiConfig {
   }
   static Future<void> setAuthToken(String token) async {
     await (await SharedPreferences.getInstance()).setString(_chaveToken, token);
+    final previous = _authToken;
     _authToken = token;
-    session.value = token;
+    // Renovar o JWT da mesma conta não deve descartar corrida, chat e perfil.
+    if (_subject(previous) != _subject(token) || _subject(token) == null) {
+      session.value = token;
+    }
+  }
+  static String? _subject(String? token) {
+    try {
+      final part = token!.split('.')[1];
+      return (jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(part)))) as Map)['sub']?.toString();
+    } catch (_) { return null; }
   }
   static Future<void> limparSessao() async {
     _authToken = null;

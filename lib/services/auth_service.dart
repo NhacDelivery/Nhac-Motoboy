@@ -20,6 +20,8 @@ class AuthService {
         'email': email, 'telefone': telefone, 'senha': senha}))['token'] as String;
   Future<String> login(String email, String senha) async =>
       (await _post('/api/v1/auth/login', {'email': email, 'senha': senha}))['token'] as String;
+  Future<String> loginComGoogle(String idToken) async =>
+      (await _post('/api/v1/auth/social', {'idToken': idToken}))['token'] as String;
   Future<void> enviarCodigoTelefone(String telefone) async {
     await _post('/api/v1/verificacao-telefone/enviar-codigo', {'telefone': telefone});
   }

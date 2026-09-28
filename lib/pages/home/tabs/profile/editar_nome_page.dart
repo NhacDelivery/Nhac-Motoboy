@@ -53,7 +53,6 @@ class _EditarNomePageState extends State<EditarNomePage> {
   Future<void> _salvarNome() async {
     try {
       setState(() => _isLoading = true);
-      await Future.delayed(const Duration(milliseconds: 300));
       if (!mounted) return;
 
       await context.read<UserProvider>().atualizarNome(_nameController.text);

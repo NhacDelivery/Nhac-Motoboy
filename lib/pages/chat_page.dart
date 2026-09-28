@@ -57,9 +57,14 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 if (p.erro != null)
                   TextButton(
-                    onPressed: () => p.conversaId == null ? p.abrir(widget.lojaId) : p.carregar(reset: true),
+                    onPressed: () => p.tentarNovamente(widget.lojaId),
                     style: TextButton.styleFrom(foregroundColor: AppColors.primaria),
                     child: Text('${p.erro} Tentar novamente'),
+                  ),
+                if (p.envioSemConfirmacao && p.connected)
+                  TextButton(
+                    onPressed: p.reenviarPendente,
+                    child: const Text('Reenviar mensagem pendente'),
                   ),
                 Expanded(
                   child: p.mensagens.isEmpty

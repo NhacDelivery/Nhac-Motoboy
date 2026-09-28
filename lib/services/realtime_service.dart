@@ -51,6 +51,7 @@ class RealtimeService {
     _client = null;
     _subscriptions.clear();
   }
+  void reconnect() { disconnect(); connect(); }
   void dispose() {
     disconnect();
     _listeners.clear();

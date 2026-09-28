@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nhac_motoboy/controllers/entrega_provider.dart';
@@ -19,11 +20,21 @@ class FakeEntregaService extends EntregadorService {
   Object? acceptError, collectError, statusError;
   int acceptCalls = 0, collectCalls = 0, finishCalls = 0, refuseCalls = 0;
   Completer<EntregaAtivaModel>? acceptGate;
-  @override Future<EntregadorCadastroModel?> obterPerfil() async => profile(operational);
+  Completer<EntregadorCadastroModel?>? profileGate;
+  Completer<RotaModel>? routeGate;
+  Completer<void>? routeStarted;
+  int routeCalls = 0, statusCalls = 0;
+  @override Future<EntregadorCadastroModel?> obterPerfil() async =>
+      profileGate == null ? profile(operational) : profileGate!.future;
   @override Future<EntregaAtivaModel?> obterEntregaAtiva() async => current;
   @override Future<List<OfertaEntregaModel>> buscarOfertasPendentes() async => pending;
-  @override Future<RotaModel> obterRota(String id) async => route();
+  @override Future<RotaModel> obterRota(String id) async {
+    routeCalls++;
+    if (routeStarted != null && !routeStarted!.isCompleted) routeStarted!.complete();
+    return routeGate == null ? route() : routeGate!.future;
+  }
   @override Future<EntregadorCadastroModel> atualizarStatus(StatusOperacional status) async {
+    statusCalls++;
     if (statusError != null) throw statusError!;
     operational = status.api; return profile(operational);
   }
@@ -51,7 +62,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await ApiConfig.setAuthToken('token');
     service = FakeEntregaService();
-    provider = EntregaProvider(service: service, automatic: false);
+    provider = EntregaProvider(service: service, automatic: false, offlineRetryDelay: Duration.zero);
   });
   tearDown(() => provider.dispose());
   test('restaura corrida e EM_ENTREGA ao abrir', () async {
@@ -134,5 +145,53 @@ void main() {
     service.pending = [offer()]; await provider.sincronizar();
     expect(await provider.recusarOferta('o1'), true);
     expect(service.refuseCalls, 1); expect(provider.ofertas, isEmpty);
+  });
+  test('aceite não espera rota e não é bloqueado por sincronização lenta', () async {
+    service.pending = [offer()]; await provider.sincronizar();
+    service.profileGate = Completer();
+    final sync = provider.sincronizar();
+    expect(provider.isSyncing, true);
+    service.routeGate = Completer();
+    expect(await provider.aceitarOfertaAtual(), true);
+    expect(provider.entregaAtiva?.pedidoId, 'p1');
+    expect(provider.rotaAtual, isNull);
+    service.profileGate!.complete(profile('EM_ENTREGA'));
+    await sync;
+    service.routeGate!.complete(route());
+    await Future<void>.delayed(Duration.zero);
+  });
+  test('falha na rota não causa nova tentativa automática a cada sincronização', () async {
+    service.current = active(); service.operational = 'EM_ENTREGA';
+    service.routeGate = Completer();
+    service.routeStarted = Completer();
+    final sync = provider.sincronizar();
+    await service.routeStarted!.future;
+    service.routeGate!.completeError(StateError('Rota indisponível'));
+    await sync;
+    expect(provider.erroRota, isNotNull);
+    await provider.sincronizar();
+    expect(service.routeCalls, 1);
+    service.routeGate = null;
+    await provider.carregarRota('p1', tentarNovamente: true);
+    expect(service.routeCalls, 2);
+    expect(provider.erroRota, isNull);
+  });
+  test('logout mantém a sessão quando servidor não confirma offline', () async {
+    await provider.sincronizar();
+    service.statusError = const ApiException(503, 'Sem conexão');
+    await expectLater(provider.sair(), throwsStateError);
+    expect(ApiConfig.temSessaoSalva, true);
+    expect(service.statusCalls, 3);
+  });
+  test('segundo plano tenta offline mesmo durante sincronização', () async {
+    await provider.sincronizar();
+    service.profileGate = Completer();
+    final sync = provider.sincronizar();
+    provider.didChangeAppLifecycleState(AppLifecycleState.paused);
+    await Future<void>.delayed(Duration.zero);
+    expect(service.operational, 'OFFLINE');
+    service.profileGate!.complete(profile('ONLINE'));
+    await sync;
+    expect(provider.estaOnline, false);
   });
 }
