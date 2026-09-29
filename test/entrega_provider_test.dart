@@ -24,6 +24,8 @@ class FakeEntregaService extends EntregadorService {
   Completer<RotaModel>? routeGate;
   Completer<void>? routeStarted;
   int routeCalls = 0, statusCalls = 0;
+  @override Future<EntregadorCadastroModel> atualizarVeiculo({required String tipoVeiculo,
+      required String placaVeiculo, String? modeloVeiculo, String? corVeiculo}) async => profile(operational);
   @override Future<EntregadorCadastroModel?> obterPerfil() async =>
       profileGate == null ? profile(operational) : profileGate!.future;
   @override Future<EntregaAtivaModel?> obterEntregaAtiva() async => current;
@@ -193,5 +195,14 @@ void main() {
     service.profileGate!.complete(profile('ONLINE'));
     await sync;
     expect(provider.estaOnline, false);
+  });
+  test('edição de veículo prossegue durante consulta periódica lenta', () async {
+    await provider.sincronizar();
+    service.profileGate = Completer();
+    final sync = provider.sincronizar();
+    await provider.atualizarVeiculo(tipoVeiculo: 'MOTO', placaVeiculo: 'ABC1234');
+    service.profileGate!.complete(profile('ONLINE'));
+    await sync;
+    expect(provider.isCadastrado, true);
   });
 }

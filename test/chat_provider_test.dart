@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nhac_motoboy/controllers/chat_provider.dart';
 import 'package:nhac_motoboy/models/mensagem_model.dart';
@@ -6,9 +7,12 @@ import 'package:nhac_motoboy/services/realtime_service.dart';
 
 class _ChatService extends ChatService {
   int historyCalls = 0;
+  Completer<void>? historyGate;
+  int? gatedCall;
   @override Future<String> abrir(String lojaId) async => 'conv_1';
   @override Future<({List<MensagemModel> mensagens, bool last})> historico(String id, int page) async {
     historyCalls++;
+    if (historyGate != null && historyCalls == gatedCall) await historyGate!.future;
     return (mensagens: <MensagemModel>[], last: true);
   }
   @override Future<void> marcarLida(String id) async {}
@@ -48,5 +52,19 @@ void main() {
     await provider.tentarNovamente('loja');
     expect(realtime.reconnects, 1);
     expect(service.historyCalls, greaterThanOrEqualTo(2));
+  });
+  test('reconexão durante a carga executa reset sem espera circular', () async {
+    final service = _ChatService();
+    final realtime = _Realtime();
+    final provider = ChatProvider(service: service, realtime: realtime);
+    addTearDown(provider.dispose);
+    await provider.abrir('loja');
+    service.historyGate = Completer<void>();
+    service.gatedCall = service.historyCalls + 1;
+    final first = provider.carregar();
+    final reset = provider.carregar(reset: true);
+    service.historyGate!.complete();
+    await Future.wait([first, reset]).timeout(const Duration(seconds: 2));
+    expect(service.historyCalls, service.gatedCall! + 1);
   });
 }

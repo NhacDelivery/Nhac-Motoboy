@@ -157,7 +157,9 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
       _atualizarPerfil(() => _service.atualizarDadosBancarios(
         tipoChavePix: tipoChavePix, chavePix: chavePix));
   Future<void> _atualizarPerfil(Future<EntregadorCadastroModel> Function() salvar) async {
-    if (_busy || _syncing || !isCadastrado) throw StateError('Aguarde o carregamento do perfil.');
+    if (_busy || !isCadastrado) throw StateError('Aguarde o carregamento do perfil.');
+    // Descarta a resposta da consulta periódica que começou antes da edição.
+    _availabilityVersion++;
     _busy = true; _notify();
     final epoch = _epoch;
     try {

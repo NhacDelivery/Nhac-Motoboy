@@ -191,7 +191,7 @@ class _PedidosTabState extends State<PedidosTab> {
         SizedBox(height: 12.h),
         Text('Loja: ${item.lojaNome ?? 'Não informada'}'),
         Text('Status: ${item.status.label}'),
-        Text('Região de entrega: ${_regiao(item)}'),
+        Text('Endereço de entrega: ${item.enderecoEntrega?.formatado ?? _regiao(item)}'),
         Text('Criado em: ${_formatarData(item.criadoEm)}'),
         if (item.coletadoEm != null) Text('Coletado em: ${_formatarData(item.coletadoEm)}'),
         if (item.entregueEm != null) Text('Concluído em: ${_formatarData(item.entregueEm)}'),
@@ -199,7 +199,6 @@ class _PedidosTabState extends State<PedidosTab> {
         Text(item.taxaFrete == null ? 'Frete não informado' :
           'Frete calculado: R\$ ${item.taxaFrete!.toStringAsFixed(2)}'),
         SizedBox(height: 8.h),
-        Text('O histórico informa somente bairro e cidade, sem o endereço completo.', style: AppTextStyles.subtitulo()),
       ]),
     )),
   );

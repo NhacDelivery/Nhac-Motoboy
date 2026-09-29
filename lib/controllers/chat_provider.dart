@@ -20,6 +20,7 @@ class ChatProvider extends ChangeNotifier {
   bool _loadingHistory = false;
   bool _pendingHistoryReset = false;
   Completer<void>? _historyCompletion;
+  Completer<void>? _pendingResetCompletion;
   int _generation = 0;
   int _page = 0;
   Timer? _timeout;
@@ -40,6 +41,8 @@ class ChatProvider extends ChangeNotifier {
     _page = 0;
     _pendingId = null; _pendingText = null;
     _pendingHistoryReset = false;
+    _pendingResetCompletion?.complete();
+    _pendingResetCompletion = null;
     if (!ApiConfig.temSessaoSalva) erro = 'Sessão encerrada.';
     _notify();
   }
@@ -47,6 +50,7 @@ class ChatProvider extends ChangeNotifier {
     final generation = ++_generation;
     realtime.dispose();
     _loadingHistory = false; _pendingHistoryReset = false;
+    _pendingResetCompletion?.complete(); _pendingResetCompletion = null;
     mensagens.clear(); _page = 0; ultima = false;
     loading = true; erro = null; _notify();
     try {
@@ -85,8 +89,13 @@ class ChatProvider extends ChangeNotifier {
   Future<void> carregar({bool reset = false}) async {
     if (conversaId == null || _disposed) return;
     if (_loadingHistory) {
-      if (reset) _pendingHistoryReset = true;
-      await _historyCompletion?.future;
+      if (reset) {
+        _pendingHistoryReset = true;
+        _pendingResetCompletion ??= Completer<void>();
+        await _pendingResetCompletion!.future;
+      } else {
+        await _historyCompletion?.future;
+      }
       return;
     }
     _loadingHistory = true;
@@ -105,13 +114,16 @@ class ChatProvider extends ChangeNotifier {
     finally {
       if (generation == _generation && !_disposed) {
         _loadingHistory = false; _notify();
-        if (_pendingHistoryReset) {
-          _pendingHistoryReset = false;
-          await carregar(reset: true);
-        }
       }
       completion.complete();
       if (identical(_historyCompletion, completion)) _historyCompletion = null;
+      if (generation == _generation && !_disposed && _pendingHistoryReset) {
+        _pendingHistoryReset = false;
+        final pending = _pendingResetCompletion;
+        _pendingResetCompletion = null;
+        try { await carregar(reset: true); }
+        finally { if (pending != null && !pending.isCompleted) pending.complete(); }
+      }
     }
   }
   Future<void> tentarNovamente(String loja) async {
@@ -146,6 +158,9 @@ class ChatProvider extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true; _timeout?.cancel(); realtime.dispose();
+    if (_pendingResetCompletion case final pending?) {
+      if (!pending.isCompleted) pending.complete();
+    }
     ApiConfig.session.removeListener(_session); super.dispose();
   }
 }

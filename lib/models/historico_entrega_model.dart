@@ -1,4 +1,5 @@
 import 'status.dart';
+import 'entrega_ativa_model.dart';
 
 /// Espelha EntregaHistoricoDTO (backend, domain/entregador/dto).
 class HistoricoEntregaModel {
@@ -6,6 +7,7 @@ class HistoricoEntregaModel {
   final String? lojaNome;
   final String? bairroEntrega;
   final String? cidadeEntrega;
+  final EnderecoEntregaModel? enderecoEntrega;
   final double? taxaFrete;
   final StatusPedido status;
   final DateTime? coletadoEm;
@@ -17,6 +19,7 @@ class HistoricoEntregaModel {
     this.lojaNome,
     this.bairroEntrega,
     this.cidadeEntrega,
+    this.enderecoEntrega,
     this.taxaFrete,
     required this.status,
     this.coletadoEm,
@@ -30,6 +33,9 @@ class HistoricoEntregaModel {
       lojaNome: json['lojaNome'] as String?,
       bairroEntrega: json['bairroEntrega'] as String?,
       cidadeEntrega: json['cidadeEntrega'] as String?,
+      enderecoEntrega: json['enderecoEntrega'] is Map<String, dynamic>
+          ? EnderecoEntregaModel.fromJson(json['enderecoEntrega'] as Map<String, dynamic>)
+          : null,
       taxaFrete: (json['taxaFrete'] as num?)?.toDouble(),
       status: StatusPedido.parse(json['status']),
       coletadoEm: json['coletadoEm'] != null ? DateTime.tryParse(json['coletadoEm'] as String) : null,
