@@ -80,3 +80,8 @@ seja loopback. `flutter test` comum apenas a marca como ignorada.
 
 Logs: `integration-logs/backend-build.log`, `backend.log`, `flutter.log` e
 `backend-sha.txt`. No GitHub ficam no artefato `motoboy-integration-logs`.
+
+A integração detectou que a main `48f553f` desfazia as tentativas erradas no
+rollback. A correção está no [PR backend #131](https://github.com/NhacDelivery/backend-nhac/pull/131).
+O CI desta suíte fixa o commit `9ad5ce3f8f521a07b44fe322b3e6de42a7e95bae`, que contém
+essa correção. Para reproduzir localmente, use esse commit/branch no backend.

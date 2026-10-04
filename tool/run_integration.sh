@@ -26,12 +26,13 @@ if curl --silent --max-time 1 http://127.0.0.1:18080/actuator/health >/dev/null;
   exit 1
 fi
 git -C "$backend_dir" rev-parse HEAD > "$logs_dir/backend-sha.txt"
+git -C "$backend_dir" status --porcelain > "$logs_dir/backend-working-tree.txt"
 (cd "$backend_dir" && ./mvnw -B -q -DskipTests test-compile dependency:build-classpath \
   "-Dmdep.outputFile=$run_dir/classpath") > "$logs_dir/backend-build.log" 2>&1
 classpath="$backend_dir/target/classes:$(cat "$run_dir/classpath")"
 javac -cp "$classpath" -d "$run_dir/classes" \
   "$app_dir/tool/integration/backend/MotoboyIntegrationFixture.java"
-java -cp "$run_dir/classes:$classpath" br.com.nhac.backend_nhac.BackendNhacApplication \
+java -Dspring.devtools.restart.enabled=false -cp "$run_dir/classes:$classpath" br.com.nhac.backend_nhac.BackendNhacApplication \
   --spring.profiles.active=motoboy-integration \
   "--spring.config.additional-location=file:$app_dir/tool/integration/backend/" \
   > "$logs_dir/backend.log" 2>&1 &

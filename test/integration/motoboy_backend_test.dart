@@ -67,6 +67,7 @@ void main() {
   late http.Client client;
   late EntregadorService service;
   final tokens = <String, String>{};
+  final locations = <String, IntegrationLocation>{};
   Future<dynamic> actor(
     String name,
     String method,
@@ -113,13 +114,16 @@ void main() {
       cnh: '12345678901',
       placaVeiculo: 'ITF1A23',
       tipoVeiculo: 'MOTO',
-      cpf: '52998224725',
+      cpf: name == 'motoboy' ? '52998224725' : '11144477735',
     );
+    final location = IntegrationLocation();
+    locations[name] = location;
     final p = EntregaProvider(
       service: service,
-      locationService: IntegrationLocation(),
+      locationService: location,
       automatic: false,
     );
+    addTearDown(p.dispose);
     await p.sincronizar();
     await p.alternarStatusOnline(true);
     expect(p.erro, isNull);
@@ -164,6 +168,11 @@ void main() {
   }
 
   Future<void> submit(WidgetTester tester, String code) async {
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('entrega-codigo')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.enterText(find.byKey(const Key('entrega-codigo')), code);
     await tester.ensureVisible(find.byKey(const Key('entrega-confirmar')));
     await tester.pumpAndSettle();
@@ -214,7 +223,7 @@ void main() {
         tester.view.resetDevicePixelRatio();
       });
       late EntregaProvider p;
-      await tester.runAsync(() async {
+      final initialized = await tester.runAsync(() async {
         p = await driver('motoboy');
         await accept(p, 'it-pedido');
         final freshProvider = EntregaProvider(
@@ -231,13 +240,16 @@ void main() {
         } finally {
           freshProvider.dispose();
         }
+        locations['motoboy']!
+          ..latitude = -23.551000
+          ..longitude = -46.634000;
         expect(await p.atualizarLocalizacao(), true);
         final location = await actor(
           'cliente',
           'GET',
           '/api/v1/entregas/it-pedido/localizacao-entregador',
         );
-        expect(location['latitude'], closeTo(-23.550520, 0.000001));
+        expect(location['latitude'], closeTo(-23.551000, 0.000001));
         expect(
           DateTime.parse(
             location['atualizadaEm'],
@@ -251,10 +263,11 @@ void main() {
         );
         expect(order['status'], 'SAIU_ENTREGA');
         expect(order['codigoEntrega'], '0123');
+        return true;
       });
+      if (initialized != true) return;
       final navigation = router();
       addTearDown(() {
-        p.dispose();
         navigation.dispose();
       });
       await tester.pumpWidget(app(p, navigation));
@@ -330,7 +343,7 @@ void main() {
             .evaluate()
             .isNotEmpty,
       );
-      expect(find.text('Integração cliente'), findsOneWidget);
+      expect(find.text('Integração'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
       await tester.runAsync(() async {
         await p.sair();
@@ -351,7 +364,7 @@ void main() {
     'IT-MOTO-002 cinco códigos errados persistem e bloqueiam nova tentativa',
     (tester) async {
       late EntregaProvider p;
-      await tester.runAsync(() async {
+      final initialized = await tester.runAsync(() async {
         p = await driver('bloqueio');
         await accept(p, 'it-bloqueio');
         for (var attempt = 1; attempt <= 4; attempt++) {
@@ -364,10 +377,11 @@ void main() {
                 'O contador deve sobreviver ao rollback da requisição inválida.',
           );
         }
+        return true;
       });
+      if (initialized != true) return;
       final navigation = router();
       addTearDown(() {
-        p.dispose();
         navigation.dispose();
       });
       await tester.pumpWidget(app(p, navigation));
