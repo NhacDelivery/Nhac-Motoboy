@@ -52,3 +52,31 @@ flutter build apk --debug
 ```
 
 A identidade visual e as regras de estado das telas estão em [DESIGN.md](DESIGN.md) e [UX-CONTRACT.md](UX-CONTRACT.md).
+
+
+## Integração com o backend real
+
+Execute `BACKEND_DIR=../backend-nhac bash tool/run_integration.sh` com Java 25 e
+Flutter 3.47.6 no PATH. O runner sobe o Spring Boot em `127.0.0.1:18080`, cria um
+H2 descartável e encerra o processo ao terminar. Não exige Docker ou credenciais
+de produção. O CI fixa o commit do backend, registrado também nos logs.
+
+| Cenário | Verificação |
+| --- | --- |
+| IT-MOTO-001 | Login JWT, cadastro de entregador, localização, ONLINE, despacho real, aceite mantendo PREPARANDO, rota, coleta para SAIU_ENTREGA, recuperação da entrega, localização visível ao cliente, erro na tela de código, código `0123`, ENTREGUE, histórico sem duplicata, avaliação real na tela e logout OFFLINE. |
+| IT-MOTO-002 | Contador persistido entre requisições, bloqueio após cinco códigos errados, tela desabilitada, código correto recusado durante o bloqueio e entrega mantida em andamento. |
+| IT-MOTO-003 | Conta sem vínculo de entregador não consulta ofertas nem a rota de outra pessoa. |
+
+HTTP, JWT, providers, telas, serviços Spring e persistência são reais. Apenas a
+leitura do GPS e SharedPreferences usam adaptadores controlados no host. O
+provedor externo de rota usa o modo de teste existente do backend. Aquisição do
+GPS no Android, telefonia, tiles do mapa, WebSocket e retomada do processo nativo
+precisam de testes em emulador/aparelho; esta suíte não afirma cobri-los.
+
+Os pedidos PREPARANDO são fixtures: criação, pagamento e preparação pelo lojista
+ficam fora deste recorte. Cada execução inicia um banco novo; não depende de uma
+execução anterior. A suíte é opt-in (`RUN_INTEGRATION=true`) e recusa URL que não
+seja loopback. `flutter test` comum apenas a marca como ignorada.
+
+Logs: `integration-logs/backend-build.log`, `backend.log`, `flutter.log` e
+`backend-sha.txt`. No GitHub ficam no artefato `motoboy-integration-logs`.

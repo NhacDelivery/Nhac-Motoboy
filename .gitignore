@@ -28,3 +28,5 @@ Thumbs.db
 
 .flutter-plugins
 .flutter-plugins-dependencies
+.integration-work/
+integration-logs/
