@@ -85,3 +85,13 @@ A integração detectou que a main `48f553f` desfazia as tentativas erradas no
 rollback. A correção está no [PR backend #131](https://github.com/NhacDelivery/backend-nhac/pull/131).
 O CI desta suíte fixa o commit `9ad5ce3f8f521a07b44fe322b3e6de42a7e95bae`, que contém
 essa correção. Para reproduzir localmente, use esse commit/branch no backend.
+
+### Otimizações de consultas e rastreamento
+
+O app usa `GET /api/v1/entregador/estado` sem cache para sincronizar perfil, corrida e ofertas em uma chamada. Servidores anteriores mantêm compatibilidade pelas consultas individuais. O CI fixa o backend `2d5dbed568efdd32cc894b91af4ef3db66bd9e02`.
+
+Frete e histórico têm cache de sessão de 45 s; avaliações, 1 min; perfil de exibição, 3 min. O cache é limitado, somente em memória, limpo na troca de conta/logout e invalidado após conclusão. Atualização manual ignora TTL. Corridas, ofertas e códigos não são usados como autoridade em cache.
+
+No Android, o GPS durante corrida usa o stream do geolocator com serviço de localização e notificação. Abrir Maps preserva esse stream; finalizar encerra rastreamento. Encerrar o processo não reinicia o serviço. Teste automatizado valida o ciclo de vida do provider; validação em aparelho com GPS, Maps e economia de bateria permanece necessária. iOS/web mantêm atualização em primeiro plano.
+
+Histórico oferece filtros por status e construção de cards sob demanda. Frete mantém dados do mesmo período em falha e usa valores em pt_BR. Testes novos cobrem cache, troca de conta, edição concorrente, GPS pausado e telas em 320 px com texto ampliado.

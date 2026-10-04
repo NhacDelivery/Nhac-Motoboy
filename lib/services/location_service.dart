@@ -57,12 +57,32 @@ class LocationService {
   /// mandando atualização a cada centímetro — só emite quando o motoboy se
   /// move pelo menos 25 metros, o que já é mais que suficiente para o raio de
   /// despacho de quilômetros e para o polling de rota do mapa.
+  bool get suportaSegundoPlano =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  /// Iniciado enquanto a corrida está visível; o Android mantém uma notificação.
+  /// O processo encerrado pelo sistema não é reiniciado automaticamente.
   Stream<Position> streamDePosicao() {
     return Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 25,
-      ),
+      locationSettings: suportaSegundoPlano
+          ? AndroidSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 0,
+              intervalDuration: const Duration(seconds: 30),
+              foregroundNotificationConfig: const ForegroundNotificationConfig(
+                notificationTitle: 'Entrega em andamento',
+                notificationText:
+                    'Sua localização acompanha a entrega, inclusive durante a navegação.',
+                notificationChannelName: 'Rastreamento de entregas',
+                notificationIcon: AndroidResource(name: 'ic_delivery_location'),
+                enableWakeLock: true,
+                setOngoing: true,
+              ),
+            )
+          : const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 25,
+            ),
     );
   }
 }

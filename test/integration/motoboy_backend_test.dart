@@ -312,6 +312,10 @@ void main() {
           hasLength(1),
         );
         expect(history.itens.single.entregueEm, isNotNull);
+        expect(history.itens.single.enderecoEntrega, isNull);
+        final estado = await service.obterEstado();
+        expect(estado.entrega, isNull);
+        expect(estado.perfil!.statusOperacional, 'ONLINE');
         await actor(
           'cliente',
           'POST',

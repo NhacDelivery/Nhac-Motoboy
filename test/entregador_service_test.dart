@@ -20,6 +20,47 @@ void main() {
   EntregadorService service(
     Future<http.Response> Function(http.Request) handler,
   ) => EntregadorService(client: MockClient(handler));
+  test(
+    'estado reúne perfil e corrida em uma única chamada sem cache operacional',
+    () async {
+      var calls = 0;
+      final s = service((r) async {
+        calls++;
+        expect(r.url.path, '/api/v1/entregador/estado');
+        return http.Response(
+          jsonEncode({
+            'perfil': profileJson('EM_ENTREGA'),
+            'entrega': activeJson(),
+            'ofertas': [],
+          }),
+          200,
+        );
+      });
+      expect((await s.obterEstado()).entrega!.pedidoId, 'p1');
+      await s.obterEstado();
+      expect(calls, 2);
+    },
+  );
+  test(
+    'backend anterior usa recuperação sem repetir endpoint ausente a cada ciclo',
+    () async {
+      var missing = 0;
+      final s = service((r) async {
+        if (r.url.path.endsWith('/estado')) {
+          missing++;
+          return http.Response('{}', 404);
+        }
+        if (r.url.path.endsWith('/perfil')) {
+          return http.Response(jsonEncode(profileJson()), 200);
+        }
+        if (r.url.path.endsWith('/ativa')) return http.Response('{}', 404);
+        return http.Response(jsonEncode([offerJson()]), 200);
+      });
+      expect((await s.obterEstado()).ofertas, hasLength(1));
+      await s.obterEstado();
+      expect(missing, 1);
+    },
+  );
   test('cadastro inclui CPF obrigatório e contrato de veículo', () async {
     final s = service((r) async {
       expect(r.url.path, '/api/v1/entregador/cadastro');

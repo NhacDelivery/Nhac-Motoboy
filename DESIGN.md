@@ -64,3 +64,7 @@ Cartões têm cantos arredondados, botões de ação são ovais, ícones operaci
 ## Operational screens
 
 A confirmação de entrega usa um campo nativo com teclado numérico e quatro dígitos, incluindo zeros iniciais. O código é informado pelo cliente; não é armazenado nem reenviado automaticamente. Erros e bloqueios ficam junto ao campo. A tela de avaliações usa cartões brancos, estrelas com descrição semântica, resumo real do servidor e paginação explícita. Formulários novos usam `InputDecorationTheme`; cartões usam `CardThemeData` em `lib/globals/app_theme.dart`. Botões coral usam texto marrom para contraste; `BotaoLargoNhac` mantém pelo menos 48 px de altura. `AppColors.erro`, `sucesso` e `superficie` são os donos dos novos tons semânticos.
+
+## Query and tracking feedback
+
+Filtros de histórico e período usam ChoiceChip nativo do tema Nhac, com texto marrom no coral. O frete mantém o resumo durante atualização do mesmo período e apresenta erro junto da tentativa manual. `lib/utils/formatters.dart` centraliza reais em pt_BR. Listas crescentes usam construção sob demanda. A última sincronização aparece na home; localização durante corrida no Android tem notificação do sistema com texto operacional curto.

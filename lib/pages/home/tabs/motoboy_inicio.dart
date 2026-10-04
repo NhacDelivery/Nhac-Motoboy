@@ -70,6 +70,14 @@ class MotoboyInicio extends StatelessWidget {
           if (p.avisoConexao != null)
             _Notice(p.avisoConexao!, action: p.sincronizar),
           if (p.aviso != null) _Notice(p.aviso!),
+          if (p.ultimaSincronizacaoEm != null)
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                'Última atualização às ${p.ultimaSincronizacaoEm!.toLocal().hour.toString().padLeft(2, '0')}:${p.ultimaSincronizacaoEm!.toLocal().minute.toString().padLeft(2, '0')}',
+                style: AppTextStyles.subtitulo(),
+              ),
+            ),
           if (p.inicializado && p.erro == null && !p.isCadastrado)
             NhacCard(
               child: InkWell(

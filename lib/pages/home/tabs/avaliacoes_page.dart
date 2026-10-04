@@ -24,14 +24,17 @@ class _AvaliacoesPageState extends State<AvaliacoesPage> {
     _load(reset: true);
   }
 
-  Future<void> _load({bool reset = false}) async {
+  Future<void> _load({bool reset = false, bool force = false}) async {
     if (_loading) return;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final result = await _service.buscarAvaliacoes(page: reset ? 0 : _page);
+      final result = await _service.buscarAvaliacoes(
+        page: reset ? 0 : _page,
+        force: force,
+      );
       if (!mounted) return;
       setState(() {
         if (reset) _itens.clear();
@@ -63,7 +66,7 @@ class _AvaliacoesPageState extends State<AvaliacoesPage> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 640),
           child: RefreshIndicator(
-            onRefresh: () => _load(reset: true),
+            onRefresh: () => _load(reset: true, force: true),
             child: ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(24),
@@ -141,7 +144,8 @@ class _AvaliacoesPageState extends State<AvaliacoesPage> {
                           ),
                         ),
                         TextButton(
-                          onPressed: () => _load(reset: _itens.isEmpty),
+                          onPressed: () =>
+                              _load(reset: _itens.isEmpty, force: true),
                           child: const Text('Tentar novamente'),
                         ),
                       ],

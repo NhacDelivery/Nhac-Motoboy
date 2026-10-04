@@ -1,3 +1,4 @@
+import 'package:nhac_motoboy/models/estado_entregador_model.dart';
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
@@ -26,6 +27,12 @@ class FakeEntregaService extends EntregadorService {
   Completer<RotaModel>? routeGate;
   Completer<void>? routeStarted;
   int routeCalls = 0, statusCalls = 0;
+  @override
+  Future<EstadoEntregadorModel> obterEstado() async => EstadoEntregadorModel(
+    perfil: await obterPerfil(),
+    entrega: current,
+    ofertas: pending,
+  );
   @override
   Future<EntregadorCadastroModel> atualizarVeiculo({
     required String tipoVeiculo,

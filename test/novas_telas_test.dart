@@ -24,6 +24,7 @@ class ReviewsService extends EntregadorService {
   Future<AvaliacoesEntregadorPagina> buscarAvaliacoes({
     int page = 0,
     int size = 20,
+    bool force = false,
   }) async {
     calls++;
     if (fail) throw const ApiException(503, 'Servidor indisponível.');

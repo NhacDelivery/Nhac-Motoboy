@@ -1,3 +1,4 @@
+import '../../../utils/formatters.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -9,18 +10,20 @@ import '../../../models/historico_entrega_model.dart';
 import '../../../services/entregador_service.dart';
 
 class PedidosTab extends StatefulWidget {
-  const PedidosTab({super.key});
+  final EntregadorService? service;
+  const PedidosTab({super.key, this.service});
   @override
   State<PedidosTab> createState() => _PedidosTabState();
 }
 
 class _PedidosTabState extends State<PedidosTab> {
-  final _service = EntregadorService();
+  late final _service = widget.service ?? EntregadorService();
   final List<HistoricoEntregaModel> _items = [];
   bool _loading = false, _last = false;
   bool _pendingReload = false;
   int _page = 0;
-  String? _error;
+  String? _error, _statusFiltro;
+  int _generation = 0;
   EntregaProvider? _entrega;
   int _lastRevision = 0;
 
@@ -54,7 +57,7 @@ class _PedidosTabState extends State<PedidosTab> {
     super.dispose();
   }
 
-  Future<void> _load({bool reset = false}) async {
+  Future<void> _load({bool reset = false, bool force = false}) async {
     if (_loading) {
       if (reset) _pendingReload = true;
       return;
@@ -63,9 +66,14 @@ class _PedidosTabState extends State<PedidosTab> {
       _loading = true;
       _error = null;
     });
+    final generation = _generation;
     try {
-      final page = await _service.buscarHistorico(page: reset ? 0 : _page);
-      if (!mounted) return;
+      final page = await _service.buscarHistorico(
+        page: reset ? 0 : _page,
+        status: _statusFiltro,
+        force: force,
+      );
+      if (!mounted || generation != _generation) return;
       setState(() {
         if (reset) _items.clear();
         _items.addAll(page.itens);
@@ -73,7 +81,9 @@ class _PedidosTabState extends State<PedidosTab> {
         _last = page.ultima;
       });
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted && generation == _generation) {
+        setState(() => _error = e.toString());
+      }
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -123,103 +133,147 @@ class _PedidosTabState extends State<PedidosTab> {
       );
     }
     return RefreshIndicator(
-      onRefresh: () => _load(reset: true),
+      onRefresh: () => _load(reset: true, force: true),
       color: AppColors.primaria,
-      child: ListView(
+      child: ListView.builder(
         padding: EdgeInsets.fromLTRB(24.w, 16.h, 24.w, 120.h),
         physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          Text('Suas corridas', style: AppTextStyles.titulo()),
-          SizedBox(height: 8.h),
-          Text(
-            'Sua entrega atual e o histórico de corridas',
-            style: AppTextStyles.subtitulo(),
-          ),
-          SizedBox(height: 24.h),
-          if (p.entregaAtiva != null)
-            Padding(
-              padding: EdgeInsets.only(bottom: 12.h),
-              child: _CorridaCard(
-                icone: Icons.two_wheeler_rounded,
-                titulo: p.entregaAtiva!.lojaNome,
-                subtitulo:
-                    'Entregar para: ${p.entregaAtiva!.clienteNome} • ${p.entregaAtiva!.statusPedido.label}',
-                onTap: () => context.push('/rota-entrega'),
-              ),
-            ),
-          SizedBox(height: 18.h),
-          Text(
-            'Histórico recente',
-            style: TextStyle(
-              fontFamily: 'Roboto',
-              fontSize: 15.sp,
-              fontWeight: FontWeight.w700,
-              color: AppColors.texto,
-            ),
-          ),
-          SizedBox(height: 12.h),
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
-              child: Center(
-                child: CircularProgressIndicator(color: AppColors.primaria),
-              ),
-            ),
-          if (_error != null)
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: 8.h),
-              child: TextButton(
-                onPressed: () => _load(reset: _items.isEmpty),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primaria,
+        itemCount: _items.length + 2,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Suas corridas', style: AppTextStyles.titulo()),
+                SizedBox(height: 8.h),
+                Text(
+                  'Sua entrega atual e o histórico de corridas',
+                  style: AppTextStyles.subtitulo(),
                 ),
-                child: Text('$_error Tentar novamente'),
-              ),
-            ),
-          if (!_loading && _error == null && _items.isEmpty)
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: 32.h),
-              child: Text(
-                'Nenhuma entrega concluída ainda.',
-                key: const Key('historico-empty'),
-                textAlign: TextAlign.center,
-                style: AppTextStyles.subtitulo(),
-              ),
-            ),
-          for (final item in _items)
-            Padding(
-              padding: EdgeInsets.only(bottom: 10.h),
-              child: _CorridaCard(
-                icone: Icons.storefront_rounded,
-                titulo: item.lojaNome ?? 'Loja',
-                subtitulo:
-                    '${item.status.label} • '
-                    '${_regiao(item)}\n${_formatarData(item.entregueEm ?? item.criadoEm)}',
-                onTap: () => _detalhes(item),
-                trailing: Text(
-                  item.taxaFrete == null
-                      ? '—'
-                      : 'R\$ ${item.taxaFrete!.toStringAsFixed(2)}',
+                SizedBox(height: 24.h),
+                if (p.entregaAtiva != null)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: 12.h),
+                    child: _CorridaCard(
+                      icone: Icons.two_wheeler_rounded,
+                      titulo: p.entregaAtiva!.lojaNome,
+                      subtitulo:
+                          'Entregar para: ${p.entregaAtiva!.clienteNome} • ${p.entregaAtiva!.statusPedido.label}',
+                      onTap: () => context.push('/rota-entrega'),
+                    ),
+                  ),
+                SizedBox(height: 18.h),
+                Text(
+                  'Histórico recente',
                   style: TextStyle(
                     fontFamily: 'Roboto',
-                    fontSize: 14.sp,
+                    fontSize: 15.sp,
                     fontWeight: FontWeight.w700,
                     color: AppColors.texto,
                   ),
                 ),
-              ),
-            ),
-          if (!_last && !_loading && _error == null)
-            Center(
-              child: TextButton(
-                onPressed: _load,
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primaria,
+                SizedBox(height: 12.h),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final filtro in const [
+                      (null, 'Todas'),
+                      ('ENTREGUE', 'Concluídas'),
+                      ('CANCELADO', 'Canceladas'),
+                    ])
+                      ChoiceChip(
+                        label: Text(filtro.$2),
+                        selected: _statusFiltro == filtro.$1,
+                        onSelected: (_) {
+                          if (_statusFiltro == filtro.$1) return;
+                          setState(() {
+                            _statusFiltro = filtro.$1;
+                            _generation++;
+                            _items.clear();
+                            _page = 0;
+                            _last = false;
+                          });
+                          _load(reset: true);
+                        },
+                      ),
+                  ],
                 ),
-                child: const Text('Carregar mais'),
+                SizedBox(height: 12.h),
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primaria,
+                      ),
+                    ),
+                  ),
+                if (_error != null)
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8.h),
+                    child: TextButton(
+                      onPressed: () =>
+                          _load(reset: _items.isEmpty, force: true),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primaria,
+                      ),
+                      child: Text('$_error Tentar novamente'),
+                    ),
+                  ),
+                if (!_loading && _error == null && _items.isEmpty)
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32.h),
+                    child: Text(
+                      _statusFiltro == null
+                          ? 'Nenhuma corrida no histórico ainda.'
+                          : 'Nenhuma corrida com este status.',
+                      key: const Key('historico-empty'),
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.subtitulo(),
+                    ),
+                  ),
+              ],
+            );
+          }
+          if (index == _items.length + 1) {
+            return Column(
+              children: [
+                if (!_last && !_loading && _error == null)
+                  Center(
+                    child: TextButton(
+                      onPressed: _load,
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primaria,
+                      ),
+                      child: const Text('Carregar mais'),
+                    ),
+                  ),
+              ],
+            );
+          }
+          final item = _items[index - 1];
+          return Padding(
+            padding: EdgeInsets.only(bottom: 10.h),
+            child: _CorridaCard(
+              icone: Icons.storefront_rounded,
+              titulo: item.lojaNome ?? 'Loja',
+              subtitulo:
+                  '${item.status.label} • '
+                  '${_regiao(item)}\n${_formatarData(item.entregueEm ?? item.criadoEm)}',
+              onTap: () => _detalhes(item),
+              trailing: Text(
+                item.taxaFrete == null ? '—' : formatarReal(item.taxaFrete!),
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.texto,
+                ),
               ),
             ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -256,9 +310,7 @@ class _PedidosTabState extends State<PedidosTab> {
             SizedBox(height: 12.h),
             Text('Loja: ${item.lojaNome ?? 'Não informada'}'),
             Text('Status: ${item.status.label}'),
-            Text(
-              'Endereço de entrega: ${item.enderecoEntrega?.formatado ?? _regiao(item)}',
-            ),
+            Text('Região da entrega: ${_regiao(item)}'),
             Text('Criado em: ${_formatarData(item.criadoEm)}'),
             if (item.coletadoEm != null)
               Text('Coletado em: ${_formatarData(item.coletadoEm)}'),
@@ -268,7 +320,7 @@ class _PedidosTabState extends State<PedidosTab> {
             Text(
               item.taxaFrete == null
                   ? 'Frete não informado'
-                  : 'Frete calculado: R\$ ${item.taxaFrete!.toStringAsFixed(2)}',
+                  : 'Frete calculado: ${formatarReal(item.taxaFrete!)}',
             ),
             SizedBox(height: 8.h),
           ],

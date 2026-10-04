@@ -11,7 +11,8 @@ class ChatProvider extends ChangeNotifier {
   final ChatService service;
   final RealtimeService realtime;
   ChatProvider({ChatService? service, RealtimeService? realtime})
-    : service = service ?? ChatService(), realtime = realtime ?? RealtimeService() {
+    : service = service ?? ChatService(),
+      realtime = realtime ?? RealtimeService() {
     ApiConfig.session.addListener(_session);
   }
   final List<MensagemModel> mensagens = [];
@@ -27,7 +28,10 @@ class ChatProvider extends ChangeNotifier {
   String? _pendingId, _pendingText;
   bool get envioSemConfirmacao => _pendingId != null && !enviando;
   bool get connected => realtime.connected;
-  void _notify() { if (!_disposed) notifyListeners(); }
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
   void _session() {
     realtime.dispose();
     _timeout?.cancel();
@@ -39,20 +43,28 @@ class ChatProvider extends ChangeNotifier {
     loading = false;
     ultima = false;
     _page = 0;
-    _pendingId = null; _pendingText = null;
+    _pendingId = null;
+    _pendingText = null;
     _pendingHistoryReset = false;
     _pendingResetCompletion?.complete();
     _pendingResetCompletion = null;
     if (!ApiConfig.temSessaoSalva) erro = 'Sessão encerrada.';
     _notify();
   }
+
   Future<void> abrir(String loja) async {
     final generation = ++_generation;
     realtime.dispose();
-    _loadingHistory = false; _pendingHistoryReset = false;
-    _pendingResetCompletion?.complete(); _pendingResetCompletion = null;
-    mensagens.clear(); _page = 0; ultima = false;
-    loading = true; erro = null; _notify();
+    _loadingHistory = false;
+    _pendingHistoryReset = false;
+    _pendingResetCompletion?.complete();
+    _pendingResetCompletion = null;
+    mensagens.clear();
+    _page = 0;
+    ultima = false;
+    loading = true;
+    erro = null;
+    _notify();
     try {
       final id = await service.abrir(loja);
       if (_disposed || generation != _generation) return;
@@ -61,31 +73,61 @@ class ChatProvider extends ChangeNotifier {
         try {
           final m = MensagemModel.fromJson(jsonDecode(body));
           receber(m);
-          service.marcarLida(conversaId!).catchError((Object e) { erro = e.toString(); _notify(); });
-        } catch (_) { erro = 'Mensagem inválida recebida.'; _notify(); }
+          service.marcarLida(conversaId!).catchError((Object e) {
+            erro = e.toString();
+            _notify();
+          });
+        } catch (_) {
+          erro = 'Mensagem inválida recebida.';
+          _notify();
+        }
       });
       realtime.listen('/user/queue/erros', (body) {
-        try { erro = (jsonDecode(body) as Map)['erro']?.toString(); }
-        catch (_) { erro = 'Não foi possível enviar a mensagem.'; }
-        enviando = false; _timeout?.cancel(); _notify();
+        try {
+          erro = (jsonDecode(body) as Map)['erro']?.toString();
+        } catch (_) {
+          erro = 'Não foi possível enviar a mensagem.';
+        }
+        enviando = false;
+        _timeout?.cancel();
+        _notify();
       });
-      realtime.onConnected = () { erro = null; carregar(reset: true); _notify(); };
-      realtime.onError = (message) { erro = message; _notify(); };
+      realtime.onConnected = () {
+        erro = null;
+        carregar(reset: true);
+        _notify();
+      };
+      realtime.onError = (message) {
+        erro = message;
+        _notify();
+      };
       realtime.connect();
       await carregar(reset: true);
-    } catch (e) { if (generation == _generation && !_disposed) erro = e.toString(); }
-    finally { if (generation == _generation) { loading = false; _notify(); } }
+    } catch (e) {
+      if (generation == _generation && !_disposed) erro = e.toString();
+    } finally {
+      if (generation == _generation) {
+        loading = false;
+        _notify();
+      }
+    }
   }
-  void receber(MensagemModel m) {
+
+  void receber(MensagemModel m, {bool notify = true}) {
     if (_disposed || m.conversaId != conversaId) return;
     mensagens.removeWhere((old) => old.id == m.id);
-    mensagens.add(m); mensagens.sort((a, b) => a.enviadaEm.compareTo(b.enviadaEm));
+    mensagens.add(m);
+    if (notify) mensagens.sort((a, b) => a.enviadaEm.compareTo(b.enviadaEm));
     if (_pendingId != null && m.id == 'msg_$_pendingId') {
-      enviando = false; _pendingId = null; _pendingText = null;
-      _timeout?.cancel(); erro = null;
+      enviando = false;
+      _pendingId = null;
+      _pendingText = null;
+      _timeout?.cancel();
+      erro = null;
     }
-    _notify();
+    if (notify) _notify();
   }
+
   Future<void> carregar({bool reset = false}) async {
     if (conversaId == null || _disposed) return;
     if (_loadingHistory) {
@@ -107,13 +149,19 @@ class ChatProvider extends ChangeNotifier {
       final result = await service.historico(id, reset ? 0 : _page);
       if (_disposed || generation != _generation || conversaId != id) return;
       if (reset) _page = 0;
-      for (final m in result.mensagens) { receber(m); }
-      _page++; ultima = result.last;
+      for (final m in result.mensagens) {
+        receber(m, notify: false);
+      }
+      mensagens.sort((a, b) => a.enviadaEm.compareTo(b.enviadaEm));
+      _page++;
+      ultima = result.last;
       await service.marcarLida(id);
-    } catch (e) { if (generation == _generation && !_disposed) erro = e.toString(); }
-    finally {
+    } catch (e) {
+      if (generation == _generation && !_disposed) erro = e.toString();
+    } finally {
       if (generation == _generation && !_disposed) {
-        _loadingHistory = false; _notify();
+        _loadingHistory = false;
+        _notify();
       }
       completion.complete();
       if (identical(_historyCompletion, completion)) _historyCompletion = null;
@@ -121,46 +169,83 @@ class ChatProvider extends ChangeNotifier {
         _pendingHistoryReset = false;
         final pending = _pendingResetCompletion;
         _pendingResetCompletion = null;
-        try { await carregar(reset: true); }
-        finally { if (pending != null && !pending.isCompleted) pending.complete(); }
+        try {
+          await carregar(reset: true);
+        } finally {
+          if (pending != null && !pending.isCompleted) pending.complete();
+        }
       }
     }
   }
+
   Future<void> tentarNovamente(String loja) async {
-    if (conversaId == null) { await abrir(loja); return; }
+    if (conversaId == null) {
+      await abrir(loja);
+      return;
+    }
     realtime.reconnect();
     await carregar(reset: true);
   }
+
   bool reenviarPendente() {
-    if (_pendingId == null || _pendingText == null || !connected || enviando || conversaId == null) return false;
+    if (_pendingId == null ||
+        _pendingText == null ||
+        !connected ||
+        enviando ||
+        conversaId == null) {
+      return false;
+    }
     return _enviarComId(_pendingText!, _pendingId!);
   }
+
   bool enviar(String text) {
     final value = text.trim();
-    if (!connected || enviando || conversaId == null || value.isEmpty || value.length > 4000) return false;
+    if (!connected ||
+        enviando ||
+        conversaId == null ||
+        value.isEmpty ||
+        value.length > 4000) {
+      return false;
+    }
     if (_pendingId != null) return false;
     return _enviarComId(value, const Uuid().v4());
   }
+
   bool _enviarComId(String value, String id) {
     try {
-      realtime.send('/app/conversas/$conversaId/enviar', {'conteudo': value, 'clientMessageId': id});
-      _pendingId = id; _pendingText = value;
-      enviando = true; erro = null;
+      realtime.send('/app/conversas/$conversaId/enviar', {
+        'conteudo': value,
+        'clientMessageId': id,
+      });
+      _pendingId = id;
+      _pendingText = value;
+      enviando = true;
+      erro = null;
       _timeout?.cancel();
       _timeout = Timer(const Duration(seconds: 15), () {
         enviando = false;
-        erro = 'Confirmação incerta. Atualize o histórico e, se necessário, reenvie a mesma mensagem.';
+        erro =
+            'Confirmação incerta. Atualize o histórico e, se necessário, reenvie a mesma mensagem.';
         _notify();
       });
-      _notify(); return true;
-    } catch (e) { erro = e.toString(); _notify(); return false; }
+      _notify();
+      return true;
+    } catch (e) {
+      erro = e.toString();
+      _notify();
+      return false;
+    }
   }
+
   @override
   void dispose() {
-    _disposed = true; _timeout?.cancel(); realtime.dispose();
+    _disposed = true;
+    _timeout?.cancel();
+    realtime.dispose();
     if (_pendingResetCompletion case final pending?) {
       if (!pending.isCompleted) pending.complete();
     }
-    ApiConfig.session.removeListener(_session); super.dispose();
+    ApiConfig.session.removeListener(_session);
+    super.dispose();
   }
 }
