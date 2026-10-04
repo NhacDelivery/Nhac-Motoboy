@@ -39,11 +39,11 @@ class LocationService {
 
   /// Uma leitura pontual de posição, com timeout curto — usada no envio
   /// imediato ao entrar online, antes do stream contínuo estabilizar.
-  Future<Position?> obterPosicaoAtual() async {
+  Future<Position?> obterPosicaoAtual({bool emEntrega = false}) async {
     try {
       return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
+        locationSettings: LocationSettings(
+          accuracy: emEntrega ? LocationAccuracy.high : LocationAccuracy.medium,
           timeLimit: Duration(seconds: 10),
         ),
       );

@@ -6,6 +6,44 @@ on:
     branches: [main]
 
 jobs:
+  integration:
+    name: Motoboy e backend real (H2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: app
+      - uses: actions/checkout@v4
+        with:
+          repository: NhacDelivery/backend-nhac
+          ref: 9ad5ce3f8f521a07b44fe322b3e6de42a7e95bae
+          path: backend-nhac
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          cache-dependency-path: backend-nhac/pom.xml
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.6'
+          cache: true
+      - run: flutter pub get
+        working-directory: app
+      - name: Fluxos com HTTP, JWT, banco e telas reais
+        run: bash tool/run_integration.sh
+        working-directory: app
+        env:
+          BACKEND_DIR: ${{ github.workspace }}/backend-nhac
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: motoboy-integration-logs
+          path: app/integration-logs/
+          if-no-files-found: error
+          retention-days: 7
   test:
     runs-on: ubuntu-latest
     steps:
@@ -13,8 +51,17 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: '3.47.6'
           cache: true
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
-      - run: flutter build apk --debug
+      - run: flutter build web --release --dart-define=API_BASE_URL=https://backend-nhac.onrender.com
+      - run: flutter build apk --debug --dart-define=API_BASE_URL=https://backend-nhac.onrender.com
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nhac-motoboy-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7

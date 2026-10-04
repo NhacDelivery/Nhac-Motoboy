@@ -1,117 +1,60 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
+
 import '../../globals/theme_colors.dart';
 
 class NhacBottomNavBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onItemSelected;
-
   const NhacBottomNavBar({
     super.key,
     required this.selectedIndex,
     required this.onItemSelected,
   });
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(50.r),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.texto.withValues(alpha: 0.1),
-            blurRadius: 16.r,
-            offset: Offset(0, 8.h),
-          ),
-        ],
-      ),
+  Widget build(BuildContext context) => Material(
+    color: AppColors.superficie,
+    elevation: 6,
+    shadowColor: AppColors.texto.withValues(alpha: .15),
+    borderRadius: BorderRadius.circular(32),
+    child: Padding(
+      padding: const EdgeInsets.all(6),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildNavItem(
-            icon: Icons.two_wheeler_rounded,
-            label: 'Início',
-            index: 0,
-          ),
-          _buildNavItem(
-            icon: Icons.receipt_long_rounded,
-            label: 'Pedidos',
-            index: 1,
-          ),
-          _buildNavItem(
-            icon: Icons.account_balance_wallet_rounded,
-            label: 'Ganhos',
-            index: 2,
-          ),
-          _buildNavItem(
-            icon: Icons.person_outline_rounded,
-            label: 'Perfil',
-            index: 3,
-          ),
+          _item(context, Icons.two_wheeler_rounded, 'Início', 0),
+          _item(context, Icons.receipt_long_rounded, 'Corridas', 1),
+          _item(context, Icons.account_balance_wallet_rounded, 'Frete', 2),
+          _item(context, Icons.person_outline_rounded, 'Perfil', 3),
         ],
       ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required IconData icon,
-    required String label,
-    required int index,
-  }) {
-    final isSelected = selectedIndex == index;
-
-    return Semantics(
-      key: index == 1 ? const Key('historico-button') : null,
-      button: true,
-      label: label,
-      selected: isSelected,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => onItemSelected(index),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 350),
-          curve: Curves.fastOutSlowIn,
-          padding: EdgeInsets.symmetric(
-            horizontal: isSelected ? 20.w : 12.w,
-            vertical: 10.h,
+    ),
+  );
+  Widget _item(BuildContext context, IconData icon, String label, int index) {
+    final selected = index == selectedIndex;
+    return Expanded(
+      child: Semantics(
+        key: index == 1 ? const Key('historico-button') : null,
+        selected: selected,
+        child: TextButton(
+          onPressed: () => onItemSelected(index),
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.texto,
+            backgroundColor: selected ? AppColors.fundo : Colors.transparent,
+            minimumSize: const Size(48, 56),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(26),
+            ),
           ),
-          decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFFFFEBD9) : Colors.transparent,
-            borderRadius: BorderRadius.circular(50.r),
-          ),
-          child: Row(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                size: 30.sp,
-                color: isSelected
-                    ? AppColors.primaria
-                    : const Color(0xFFA0A0A0),
-              ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 350),
-                curve: Curves.fastOutSlowIn,
-                child: SizedBox(
-                  width: isSelected ? null : 0,
-                  child: isSelected
-                      ? Padding(
-                          padding: EdgeInsets.only(left: 8.w),
-                          child: Text(
-                            label,
-                            maxLines: 1,
-                            overflow: TextOverflow.clip,
-                            style: TextStyle(
-                              fontFamily: 'Roboto',
-                              color: AppColors.primaria,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14.sp,
-                            ),
-                          ),
-                        )
-                      : const SizedBox.shrink(),
+              Icon(icon, size: 24),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
                 ),
               ),
             ],

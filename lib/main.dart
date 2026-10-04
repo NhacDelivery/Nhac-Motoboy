@@ -6,7 +6,7 @@ import 'controllers/cadastro_controller.dart';
 import 'controllers/entrega_provider.dart';
 import 'controllers/user_provider.dart';
 import 'globals/router.dart';
-import 'globals/theme_colors.dart';
+import 'globals/app_theme.dart';
 import 'services/api_config.dart';
 
 void main() async {
@@ -43,20 +43,7 @@ class MeuApp extends StatelessWidget {
         return MaterialApp.router(
           debugShowCheckedModeBanner: false,
           title: 'Nhac Motoboy',
-          theme: ThemeData(
-            useMaterial3: true,
-            fontFamily: 'Roboto',
-            scaffoldBackgroundColor: AppColors.fundo,
-            colorScheme: ColorScheme.light(
-              primary: AppColors.primaria,
-              surface: AppColors.fundo,
-            ),
-            appBarTheme: const AppBarTheme(
-              backgroundColor: AppColors.fundo,
-              surfaceTintColor: Colors.transparent,
-              elevation: 0,
-            ),
-          ),
+          theme: nhacTheme,
           routerConfig: appRouter,
         );
       },
