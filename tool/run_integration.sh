@@ -43,13 +43,13 @@ for ((attempt=0; attempt<120; attempt++)); do
     tail -80 "$logs_dir/backend.log"
     exit 1
   fi
-  if rg -q MOTOBOY_INTEGRATION_FIXTURE_READY "$logs_dir/backend.log" && \
+  if grep -q MOTOBOY_INTEGRATION_FIXTURE_READY "$logs_dir/backend.log" && \
     curl --fail --silent --max-time 1 http://127.0.0.1:18080/actuator/health >/dev/null; then
     break
   fi
   sleep 1
 done
-if ! rg -q MOTOBOY_INTEGRATION_FIXTURE_READY "$logs_dir/backend.log"; then
+if ! grep -q MOTOBOY_INTEGRATION_FIXTURE_READY "$logs_dir/backend.log"; then
   tail -80 "$logs_dir/backend.log"
   exit 1
 fi
