@@ -1,3 +1,4 @@
+import '../../../utils/formatters.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -12,7 +13,8 @@ import '../../../services/entregador_service.dart';
 /// mesmo com GET /api/v1/entregador/ganhos (V039) já existindo pra alimentar
 /// exatamente isto.
 class GanhosTab extends StatefulWidget {
-  const GanhosTab({super.key});
+  final EntregadorService? service;
+  const GanhosTab({super.key, this.service});
 
   @override
   State<GanhosTab> createState() => _GanhosTabState();
@@ -22,20 +24,20 @@ enum _Periodo { hoje, seteDias, trintaDias }
 
 extension on _Periodo {
   String get chaveApi => switch (this) {
-        _Periodo.hoje => 'HOJE',
-        _Periodo.seteDias => 'SETE_DIAS',
-        _Periodo.trintaDias => 'TRINTA_DIAS',
-      };
+    _Periodo.hoje => 'HOJE',
+    _Periodo.seteDias => 'SETE_DIAS',
+    _Periodo.trintaDias => 'TRINTA_DIAS',
+  };
 
   String get rotulo => switch (this) {
-        _Periodo.hoje => 'Hoje',
-        _Periodo.seteDias => '7 dias',
-        _Periodo.trintaDias => '30 dias',
-      };
+    _Periodo.hoje => 'Hoje',
+    _Periodo.seteDias => '7 dias',
+    _Periodo.trintaDias => '30 dias',
+  };
 }
 
 class _GanhosTabState extends State<GanhosTab> {
-  final EntregadorService _service = EntregadorService();
+  late final EntregadorService _service = widget.service ?? EntregadorService();
   _Periodo _periodoSelecionado = _Periodo.hoje;
   GanhosEntregadorModel? _ganhos;
   bool _carregando = true;
@@ -50,6 +52,7 @@ class _GanhosTabState extends State<GanhosTab> {
     super.initState();
     _carregarGanhos();
   }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -60,16 +63,21 @@ class _GanhosTabState extends State<GanhosTab> {
     _lastRevision = provider.entregasConcluidasRevision;
     provider.addListener(_onEntregaChanged);
   }
+
   void _onEntregaChanged() {
     final revision = _entrega?.entregasConcluidasRevision ?? 0;
     if (revision == _lastRevision) return;
     _lastRevision = revision;
     _carregarGanhos();
   }
-  @override
-  void dispose() { _entrega?.removeListener(_onEntregaChanged); super.dispose(); }
 
-  Future<void> _carregarGanhos() async {
+  @override
+  void dispose() {
+    _entrega?.removeListener(_onEntregaChanged);
+    super.dispose();
+  }
+
+  Future<void> _carregarGanhos({bool force = false}) async {
     final requestId = ++_requestId;
     setState(() {
       _carregando = true;
@@ -78,7 +86,10 @@ class _GanhosTabState extends State<GanhosTab> {
     });
 
     try {
-      final resultado = await _service.buscarGanhos(periodo: _periodoSelecionado.chaveApi);
+      final resultado = await _service.buscarGanhos(
+        periodo: _periodoSelecionado.chaveApi,
+        force: force,
+      );
       if (!mounted || requestId != _requestId) return;
       setState(() {
         _carregando = false;
@@ -100,23 +111,31 @@ class _GanhosTabState extends State<GanhosTab> {
       });
     } catch (e) {
       if (!mounted || requestId != _requestId) return;
-      setState(() { _carregando = false; _erro = e.toString(); });
+      setState(() {
+        _carregando = false;
+        _erro = e.toString();
+      });
     }
   }
 
   void _selecionarPeriodo(_Periodo periodo) {
     if (periodo == _periodoSelecionado) return;
-    setState(() => _periodoSelecionado = periodo);
+    setState(() {
+      _periodoSelecionado = periodo;
+      _ganhos = null;
+    });
     _carregarGanhos();
   }
 
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
-      onRefresh: _carregarGanhos,
+      onRefresh: () => _carregarGanhos(force: true),
       color: AppColors.primaria,
       child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
         padding: EdgeInsets.fromLTRB(24.w, 16.h, 24.w, 110.h),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,40 +147,46 @@ class _GanhosTabState extends State<GanhosTab> {
               style: AppTextStyles.subtitulo(),
             ),
             SizedBox(height: 20.h),
-            Row(
+            Wrap(
+              runSpacing: 8,
               children: _Periodo.values
-                  .map((p) => Padding(
-                        padding: EdgeInsets.only(right: 8.w),
-                        child: ChoiceChip(
-                          label: Text(p.rotulo),
-                          selected: _periodoSelecionado == p,
-                          onSelected: (_) => _selecionarPeriodo(p),
-                          selectedColor: AppColors.primaria,
-                          labelStyle: TextStyle(
-                            color: _periodoSelecionado == p ? Colors.white : AppColors.texto,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          backgroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20.r),
-                            side: BorderSide(color: AppColors.bordaInativa),
-                          ),
+                  .map(
+                    (p) => Padding(
+                      padding: EdgeInsets.only(right: 8.w),
+                      child: ChoiceChip(
+                        label: Text(p.rotulo),
+                        selected: _periodoSelecionado == p,
+                        onSelected: (_) => _selecionarPeriodo(p),
+                        selectedColor: AppColors.primaria,
+                        labelStyle: TextStyle(
+                          color: AppColors.texto,
+                          fontWeight: FontWeight.w600,
                         ),
-                      ))
+                        backgroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20.r),
+                          side: BorderSide(color: AppColors.bordaInativa),
+                        ),
+                      ),
+                    ),
+                  )
                   .toList(),
             ),
             SizedBox(height: 20.h),
-            if (_carregando)
+            if (_carregando && _ganhos == null)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 40),
-                child: Center(child: CircularProgressIndicator(color: AppColors.primaria)),
+                child: Center(
+                  child: CircularProgressIndicator(color: AppColors.primaria),
+                ),
               )
             else if (_naoEhEntregador)
               _buildNaoEhEntregador()
-            else if (_erro != null)
-              _buildErro()
-            else
-              _buildResumo(_ganhos!),
+            else ...[
+              if (_carregando) const LinearProgressIndicator(),
+              if (_erro != null) _buildErro(),
+              if (_ganhos != null) _buildResumo(_ganhos!),
+            ],
           ],
         ),
       ),
@@ -174,21 +199,37 @@ class _GanhosTabState extends State<GanhosTab> {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(24.r),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20.r)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20.r),
+      ),
       child: Column(
         children: [
-          Icon(Icons.two_wheeler_rounded, size: 40.r, color: AppColors.bordaInativa),
+          Icon(
+            Icons.two_wheeler_rounded,
+            size: 40.r,
+            color: AppColors.bordaInativa,
+          ),
           SizedBox(height: 12.h),
           Text(
             'Você ainda não tem ganhos por aqui',
             textAlign: TextAlign.center,
-            style: TextStyle(fontFamily: 'Roboto', fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.texto),
+            style: TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 15.sp,
+              fontWeight: FontWeight.w700,
+              color: AppColors.texto,
+            ),
           ),
           SizedBox(height: 6.h),
           Text(
             'Complete seu cadastro de entregador para começar a receber corridas.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontFamily: 'Roboto', fontSize: 13.sp, color: AppColors.desabilitado),
+            style: TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 13.sp,
+              color: AppColors.desabilitado,
+            ),
           ),
         ],
       ),
@@ -198,12 +239,21 @@ class _GanhosTabState extends State<GanhosTab> {
   Widget _buildErro() {
     return Container(
       padding: EdgeInsets.all(24.r),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20.r)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20.r),
+      ),
       child: Column(
         children: [
-          Text(_erro!, style: TextStyle(color: AppColors.desabilitado, fontSize: 14.sp)),
+          Text(
+            _erro!,
+            style: TextStyle(color: AppColors.desabilitado, fontSize: 14.sp),
+          ),
           SizedBox(height: 12.h),
-          TextButton(onPressed: _carregarGanhos, child: const Text('Tentar novamente')),
+          TextButton(
+            onPressed: () => _carregarGanhos(force: true),
+            child: const Text('Tentar novamente'),
+          ),
         ],
       ),
     );
@@ -232,11 +282,15 @@ class _GanhosTabState extends State<GanhosTab> {
             children: [
               Text(
                 'Frete calculado (${_periodoSelecionado.rotulo.toLowerCase()})',
-                style: TextStyle(fontFamily: 'Roboto', fontSize: 14.sp, color: AppColors.desabilitado),
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 14.sp,
+                  color: AppColors.desabilitado,
+                ),
               ),
               SizedBox(height: 8.h),
               Text(
-                'R\$ ${ganhos.totalGanhos.toStringAsFixed(2)}',
+                formatarReal(ganhos.totalGanhos),
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 32.sp,
@@ -245,11 +299,15 @@ class _GanhosTabState extends State<GanhosTab> {
                 ),
               ),
               SizedBox(height: 16.h),
-              Row(
+              Wrap(
+                spacing: 24,
+                runSpacing: 12,
                 children: [
                   _buildEstatistica('Entregas', '${ganhos.totalEntregas}'),
-                  SizedBox(width: 24.w),
-                  _buildEstatistica('Ticket médio', 'R\$ ${ganhos.ticketMedio.toStringAsFixed(2)}'),
+                  _buildEstatistica(
+                    'Ticket médio',
+                    formatarReal(ganhos.ticketMedio),
+                  ),
                 ],
               ),
             ],
@@ -258,7 +316,12 @@ class _GanhosTabState extends State<GanhosTab> {
         SizedBox(height: 20.h),
         Text(
           'Por dia',
-          style: TextStyle(fontFamily: 'Roboto', fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.texto),
+          style: TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 15.sp,
+            fontWeight: FontWeight.w700,
+            color: AppColors.texto,
+          ),
         ),
         SizedBox(height: 12.h),
         ...ganhos.porDia.reversed.map((dia) => _buildLinhaDia(dia)),
@@ -270,10 +333,22 @@ class _GanhosTabState extends State<GanhosTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(rotulo, style: TextStyle(fontFamily: 'Roboto', fontSize: 12.sp, color: AppColors.desabilitado)),
+        Text(
+          rotulo,
+          style: TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 12.sp,
+            color: AppColors.desabilitado,
+          ),
+        ),
         Text(
           valor,
-          style: TextStyle(fontFamily: 'Roboto', fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.texto),
+          style: TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 15.sp,
+            fontWeight: FontWeight.w700,
+            color: AppColors.texto,
+          ),
         ),
       ],
     );
@@ -281,22 +356,44 @@ class _GanhosTabState extends State<GanhosTab> {
 
   Widget _buildLinhaDia(GanhoDiaModel dia) {
     final data = dia.data;
-    final rotuloData = '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}';
+    final rotuloData =
+        '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}';
     return Container(
       margin: EdgeInsets.only(bottom: 8.h),
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14.r)),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14.r),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        spacing: 12,
+        runSpacing: 8,
         children: [
-          Text(rotuloData, style: TextStyle(fontFamily: 'Roboto', fontSize: 14.sp, color: AppColors.texto)),
           Text(
-            '${dia.entregas} entrega${dia.entregas == 1 ? '' : 's'}',
-            style: TextStyle(fontFamily: 'Roboto', fontSize: 13.sp, color: AppColors.desabilitado),
+            rotuloData,
+            style: TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 14.sp,
+              color: AppColors.texto,
+            ),
           ),
           Text(
-            'R\$ ${dia.valor.toStringAsFixed(2)}',
-            style: TextStyle(fontFamily: 'Roboto', fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.texto),
+            '${dia.entregas} entrega${dia.entregas == 1 ? '' : 's'}',
+            style: TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 13.sp,
+              color: AppColors.desabilitado,
+            ),
+          ),
+          Text(
+            formatarReal(dia.valor),
+            style: TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w700,
+              color: AppColors.texto,
+            ),
           ),
         ],
       ),

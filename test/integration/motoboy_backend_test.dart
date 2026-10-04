@@ -208,10 +208,13 @@ void main() {
     for (final name in ['cliente', 'lojista', 'motoboy', 'bloqueio', 'outro']) {
       await login(name);
     }
-  });
-  tearDownAll(() {
     client.close();
   });
+  setUp(() {
+    client = http.Client();
+    service = EntregadorService(client: client);
+  });
+  tearDown(() => client.close());
 
   testWidgets(
     'IT-MOTO-001 oferta → coleta → localização → código → avaliação',
@@ -312,6 +315,10 @@ void main() {
           hasLength(1),
         );
         expect(history.itens.single.entregueEm, isNotNull);
+        expect(history.itens.single.enderecoEntrega, isNull);
+        final estado = await service.obterEstado();
+        expect(estado.entrega, isNull);
+        expect(estado.perfil!.statusOperacional, 'ONLINE');
         await actor(
           'cliente',
           'POST',
@@ -357,6 +364,7 @@ void main() {
           'OFFLINE',
         );
       });
+      client.close();
     },
   );
 
@@ -416,6 +424,7 @@ void main() {
         );
         expect((await service.obterPerfil())!.statusOperacional, 'EM_ENTREGA');
       });
+      client.close();
       await tester.pumpWidget(const SizedBox());
     },
   );

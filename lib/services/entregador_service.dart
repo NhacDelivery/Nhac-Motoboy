@@ -1,3 +1,6 @@
+import '../models/estado_entregador_model.dart';
+import 'session_query_cache.dart';
+import 'api_config.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/entregador_cadastro_model.dart';
@@ -15,6 +18,43 @@ class EntregadorService {
   final ApiClient api;
   EntregadorService({http.Client? client, ApiClient? api})
     : api = api ?? ApiClient(client: client);
+  DateTime? _tentarEstadoDepois;
+  static void invalidarConsultas() => SessionQueryCache.shared.clear();
+
+  Future<EstadoEntregadorModel> obterEstado() async {
+    if (_tentarEstadoDepois == null ||
+        DateTime.now().isAfter(_tentarEstadoDepois!)) {
+      try {
+        return EstadoEntregadorModel.fromJson(
+          await api.request('GET', '/api/v1/entregador/estado'),
+        );
+      } on ApiException catch (e) {
+        if (e.status != 404) rethrow;
+        // Compatibilidade enquanto o backend novo ainda não foi implantado.
+        _tentarEstadoDepois = DateTime.now().add(const Duration(minutes: 5));
+      }
+    }
+    final profile = await obterPerfil();
+    if (profile?.ativo != true) return EstadoEntregadorModel(perfil: profile);
+    final active = await obterEntregaAtiva();
+    final offers = active == null && profile!.statusOperacional == 'ONLINE'
+        ? await buscarOfertasPendentes()
+        : <OfertaEntregaModel>[];
+    return EstadoEntregadorModel(
+      perfil: profile,
+      entrega: active,
+      ofertas: offers,
+    );
+  }
+
+  String _key(String resource) => '${ApiConfig.baseUrl}:$resource';
+  // O recorte de fretes da API usa America/Sao_Paulo (UTC-3 atualmente).
+  String get _diaFrete => DateTime.now()
+      .toUtc()
+      .subtract(const Duration(hours: 3))
+      .toIso8601String()
+      .substring(0, 10);
+
   Future<EntregadorCadastroModel> cadastrarEntregador({
     required String cnh,
     required String placaVeiculo,
@@ -166,32 +206,52 @@ class EntregadorService {
   Future<AvaliacoesEntregadorPagina> buscarAvaliacoes({
     int page = 0,
     int size = 20,
-  }) async => AvaliacoesEntregadorPagina.fromJson(
-    await api.request(
-      'GET',
-      '/api/v1/entregador/avaliacoes',
-      query: {'page': '$page', 'size': '$size', 'sort': 'criadoEm,desc'},
+    bool force = false,
+  }) => SessionQueryCache.shared.load(
+    _key('avaliacoes:$page:$size'),
+    const Duration(minutes: 1),
+    () async => AvaliacoesEntregadorPagina.fromJson(
+      await api.request(
+        'GET',
+        '/api/v1/entregador/avaliacoes',
+        query: {'page': '$page', 'size': '$size', 'sort': 'criadoEm,desc'},
+      ),
     ),
+    force: force,
   );
   Future<HistoricoEntregasPagina> buscarHistorico({
     String? status,
     int page = 0,
     int size = 20,
-  }) async => HistoricoEntregasPagina.fromJson(
-    await api.request(
-      'GET',
-      '/api/v1/entregador/entregas',
-      query: {'page': '$page', 'size': '$size', 'status': ?status},
+    bool force = false,
+  }) => SessionQueryCache.shared.load(
+    _key('historico:$status:$page:$size'),
+    const Duration(seconds: 45),
+    () async => HistoricoEntregasPagina.fromJson(
+      await api.request(
+        'GET',
+        '/api/v1/entregador/entregas',
+        query: {'page': '$page', 'size': '$size', 'status': ?status},
+      ),
     ),
+    force: force,
   );
-  Future<GanhosEntregadorModel?> buscarGanhos({String periodo = 'HOJE'}) async {
+  Future<GanhosEntregadorModel?> buscarGanhos({
+    String periodo = 'HOJE',
+    bool force = false,
+  }) async {
     try {
-      return GanhosEntregadorModel.fromJson(
-        await api.request(
-          'GET',
-          '/api/v1/entregador/ganhos',
-          query: {'periodo': periodo},
+      return await SessionQueryCache.shared.load(
+        _key('frete:$_diaFrete:$periodo'),
+        const Duration(seconds: 45),
+        () async => GanhosEntregadorModel.fromJson(
+          await api.request(
+            'GET',
+            '/api/v1/entregador/ganhos',
+            query: {'periodo': periodo},
+          ),
         ),
+        force: force,
       );
     } on ApiException catch (e) {
       if (e.status == 404) throw EntregadorNaoCadastradoException();

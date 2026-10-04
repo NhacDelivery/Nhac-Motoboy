@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../models/entrega_ativa_model.dart';
 import '../models/oferta_entrega_model.dart';
@@ -53,7 +54,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
   bool _changingStatus = false, _pendingOffline = false, _routeLoading = false;
   Future<bool>? _offlineOperation;
   String? _routeRequestedFor;
-  DateTime? ultimaLocalizacaoEm;
+  DateTime? ultimaLocalizacaoEm, ultimaSincronizacaoEm;
   int entregasConcluidasRevision = 0;
   bool inicializado = false;
   int _epoch = 0;
@@ -61,6 +62,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
   String? erro, aviso, erroRota, erroLocalizacao, avisoConexao;
   double? latitudeAtual, longitudeAtual;
   Timer? _refreshTimer, _gpsTimer, _clock;
+  StreamSubscription<Position>? _deliveryGps;
   String? _pedidoTopic;
   Duration? _refreshInterval;
   bool _lastFresh = false;
@@ -117,6 +119,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     latitudeAtual = null;
     longitudeAtual = null;
     ultimaLocalizacaoEm = null;
+    ultimaSincronizacaoEm = null;
     erro = null;
     aviso = null;
     erroRota = null;
@@ -155,7 +158,8 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     final epoch = _epoch;
     final availabilityVersion = _availabilityVersion;
     try {
-      final profile = await _service.obterPerfil();
+      final state = await _service.obterEstado();
+      final profile = state.perfil;
       if (!_valid(epoch) ||
           _busy ||
           _pendingOffline ||
@@ -164,7 +168,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
       }
       _applyProfile(profile);
       if (profile?.ativo == true) {
-        final active = await _service.obterEntregaAtiva();
+        final active = state.entrega;
         if (!_valid(epoch) ||
             _busy ||
             _pendingOffline ||
@@ -180,13 +184,14 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
           if (previous != null) {
             aviso = 'A corrida foi encerrada. Seu status foi atualizado.';
             entregasConcluidasRevision++;
+            EntregadorService.invalidarConsultas();
           }
         } else {
           _status = StatusOperacional.emEntrega;
           _ofertas.clear();
         }
         if (estaOnline && active == null) {
-          final offers = await _service.buscarOfertasPendentes();
+          final offers = state.ofertas;
           if (!_valid(epoch) ||
               _busy ||
               _pendingOffline ||
@@ -207,6 +212,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
         _rota = null;
         _stop();
       }
+      ultimaSincronizacaoEm = DateTime.now();
       erro = null;
     } catch (e) {
       if (_valid(epoch) && availabilityVersion == _availabilityVersion) {
@@ -431,7 +437,54 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  void _updateDeliveryGps() {
+    if (automatic &&
+        emEntrega &&
+        _location.suportaSegundoPlano &&
+        _foreground) {
+      final epoch = _epoch;
+      _deliveryGps ??= _location.streamDePosicao().listen(
+        (position) {
+          if (_valid(epoch) && emEntrega) {
+            unawaited(_enviarPosicao(position, epoch));
+          }
+        },
+        onError: (Object error) {
+          if (!_valid(epoch)) return;
+          erroLocalizacao =
+              'Não foi possível acompanhar o GPS. Abra o app e atualize sua localização.';
+          _notify();
+        },
+      );
+    } else if (!emEntrega) {
+      unawaited(_deliveryGps?.cancel());
+      _deliveryGps = null;
+    }
+  }
+
+  Future<void> _enviarPosicao(Position position, int epoch) async {
+    if (_gpsBusy || !_valid(epoch) || !emEntrega) return;
+    if (DateTime.now().difference(position.timestamp).inSeconds > 60) return;
+    _gpsBusy = true;
+    try {
+      await _service.enviarLocalizacao(position.latitude, position.longitude);
+      if (!_valid(epoch)) return;
+      latitudeAtual = position.latitude;
+      longitudeAtual = position.longitude;
+      ultimaLocalizacaoEm = position.timestamp;
+      erroLocalizacao = null;
+    } catch (e) {
+      if (_valid(epoch)) erroLocalizacao = e.toString();
+    } finally {
+      if (_valid(epoch)) {
+        _gpsBusy = false;
+        _notify();
+      }
+    }
+  }
+
   void _start() {
+    _updateDeliveryGps();
     if (!automatic || !_foreground || !cadastroAtivo) return;
     // A oferta tem prazo curto; a consulta periódica recupera mensagens
     // perdidas quando o WebSocket cai ou o app volta ao primeiro plano.
@@ -453,7 +506,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
         _notify();
       }
     });
-    if (estaOnline || emEntrega) {
+    if ((estaOnline || emEntrega) && _deliveryGps == null) {
       _gpsTimer ??= Timer.periodic(
         const Duration(seconds: 30),
         (_) => atualizarLocalizacao(),
@@ -504,6 +557,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
             _rota = null;
             _ofertas.clear();
             if (haviaEntrega) entregasConcluidasRevision++;
+            EntregadorService.invalidarConsultas();
             aviso = state == StatusPedido.cancelado
                 ? 'O pedido foi cancelado.'
                 : 'Entrega concluída.';
@@ -615,9 +669,11 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
         _rota = null;
         _routeRequestedFor = null;
         entregasConcluidasRevision++;
+        EntregadorService.invalidarConsultas();
         _status = StatusOperacional.online;
         aviso = 'Entrega concluída!';
         _start();
+        if (!_foreground) unawaited(_ficarOffline());
         _registrarAviso(aviso!);
       },
       onError: (e) {
@@ -675,12 +731,16 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _foreground = false;
-      _stop();
+      _stop(preservarGps: emEntrega && state == AppLifecycleState.paused);
       if (estaOnline) unawaited(_ficarOffline());
     }
   }
 
-  void _stop() {
+  void _stop({bool preservarGps = false}) {
+    if (!preservarGps) {
+      unawaited(_deliveryGps?.cancel());
+      _deliveryGps = null;
+    }
     _refreshTimer?.cancel();
     _refreshTimer = null;
     _refreshInterval = null;
