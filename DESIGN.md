@@ -9,6 +9,9 @@ colors:
   text: "#5D201C"
   muted: "#757575"
   border: "#C9BCBC"
+  error: "#B3261E"
+  success: "#2E7D32"
+  surface: "#FFFFFF"
 typography:
   body:
     fontFamily: "Roboto, sans-serif"
@@ -37,7 +40,7 @@ Roboto está declarado em `pubspec.yaml`. `AppTextStyles` centraliza título, su
 
 ## Layout
 
-Abas inferiores reúnem início, pedidos, frete e perfil. Áreas de toque preservam SafeArea e espaçamento para o teclado. O cartão de oferta mantém prazo, frete, endereço e decisões no mesmo bloco.
+Abas inferiores reúnem Início, Corridas, Frete e Perfil, com rótulos sempre visíveis e largura estável. A cápsula branca preserva a navegação do universo Nhac. Áreas de toque preservam SafeArea e espaçamento para o teclado. O cartão de oferta mantém prazo, frete, endereço e decisões no mesmo bloco.
 
 ## Elevation & Depth
 
@@ -57,3 +60,7 @@ Cartões têm cantos arredondados, botões de ação são ovais, ícones operaci
 - Identificar valores como frete calculado até existir um contrato de repasse e pagamento.
 - Não anunciar uma entrega concluída, uma mensagem enviada ou um status offline sem confirmação do servidor.
 - Não introduzir cores ou primitivas globais novas para resolver um único fluxo.
+
+## Operational screens
+
+A confirmação de entrega usa um campo nativo com teclado numérico e quatro dígitos, incluindo zeros iniciais. O código é informado pelo cliente; não é armazenado nem reenviado automaticamente. Erros e bloqueios ficam junto ao campo. A tela de avaliações usa cartões brancos, estrelas com descrição semântica, resumo real do servidor e paginação explícita. Formulários novos usam `InputDecorationTheme`; cartões usam `CardThemeData` em `lib/globals/app_theme.dart`. Botões coral usam texto marrom para contraste; `BotaoLargoNhac` mantém pelo menos 48 px de altura. `AppColors.erro`, `sucesso` e `superficie` são os donos dos novos tons semânticos.

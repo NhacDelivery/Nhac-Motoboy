@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
@@ -68,11 +69,14 @@ class _CriarContaCodigoPageState extends State<CriarContaCodigoPage> {
     final email = context.read<CadastroController>().email;
     try {
       await _authService.enviarCodigoCadastro(email);
+      if (!mounted) return;
       _iniciarTimer();
       if (mounted) context.showSuccess('Código reenviado para $email!');
     } catch (e) {
       if (mounted) {
-        setState(() => _errorMessage = e.toString().replaceAll('Exception: ', ''));
+        setState(
+          () => _errorMessage = e.toString().replaceAll('Exception: ', ''),
+        );
       }
     } finally {
       if (mounted) setState(() => _reenviando = false);
@@ -91,7 +95,7 @@ class _CriarContaCodigoPageState extends State<CriarContaCodigoPage> {
   }
 
   Future<void> _confirmarCodigo() async {
-    if (!_codigoValido) return;
+    if (!_codigoValido || _isLoading) return;
 
     setState(() {
       _isLoading = true;
@@ -109,7 +113,11 @@ class _CriarContaCodigoPageState extends State<CriarContaCodigoPage> {
       context.push('/criar-conta-dados');
     } catch (e) {
       if (!mounted) return;
-      setState(() => _errorMessage = e.toString().replaceAll('Exception: ', ''));
+      _pinController.clear();
+      setState(() {
+        _codigoValido = false;
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -135,7 +143,10 @@ class _CriarContaCodigoPageState extends State<CriarContaCodigoPage> {
                     children: [
                       const SetaVoltar(),
                       SizedBox(height: 20.h),
-                      Text('Confirme seu e-mail', style: AppTextStyles.titulo()),
+                      Text(
+                        'Confirme seu e-mail',
+                        style: AppTextStyles.titulo(),
+                      ),
                       SizedBox(height: 8.h),
                       Text(
                         'Insira o código de 6 dígitos que enviamos para $email',
@@ -171,21 +182,27 @@ class _CriarContaCodigoPageState extends State<CriarContaCodigoPage> {
                         ),
                         enableActiveFill: true,
                         onChanged: (valor) {
-                          setState(() => _codigoValido = valor.trim().length == 6);
+                          setState(
+                            () => _codigoValido = valor.trim().length == 6,
+                          );
                         },
                         onCompleted: (valor) => _confirmarCodigo(),
                       ),
                       SizedBox(height: 20.h),
                       Center(
                         child: TextButton(
-                          onPressed: _podeReenviar && !_reenviando ? _reenviarCodigo : null,
+                          onPressed: _podeReenviar && !_reenviando
+                              ? _reenviarCodigo
+                              : null,
                           child: Text(
                             _podeReenviar
                                 ? 'Reenviar código por e-mail'
                                 : 'Reenviar código em 00:${_tempoRestante.toString().padLeft(2, '0')}',
                             style: TextStyle(
                               fontFamily: 'Roboto',
-                            color: _podeReenviar && !_reenviando ? AppColors.primaria : AppColors.desabilitado,
+                              color: _podeReenviar && !_reenviando
+                                  ? AppColors.primaria
+                                  : AppColors.desabilitado,
                               fontSize: 15.sp,
                               fontWeight: FontWeight.w600,
                             ),
@@ -197,12 +214,20 @@ class _CriarContaCodigoPageState extends State<CriarContaCodigoPage> {
                           padding: EdgeInsets.only(top: 16.h),
                           child: Row(
                             children: [
-                              Icon(Icons.error_outline, color: Colors.red, size: 16.r),
+                              Icon(
+                                Icons.error_outline,
+                                color: Colors.red,
+                                size: 16.r,
+                              ),
                               SizedBox(width: 8.w),
                               Expanded(
                                 child: Text(
                                   _errorMessage!,
-                                  style: TextStyle(color: Colors.red, fontSize: 13.sp, fontWeight: FontWeight.w500),
+                                  style: TextStyle(
+                                    color: Colors.red,
+                                    fontSize: 13.sp,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
                             ],
