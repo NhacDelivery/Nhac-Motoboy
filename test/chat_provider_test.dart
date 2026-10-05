@@ -13,10 +13,11 @@ import 'package:nhac_motoboy/services/realtime_service.dart';
 
 class _ChatService extends ChatService {
   int historyCalls = 0;
+  String conversation = 'conv_1';
   Completer<void>? historyGate;
   int? gatedCall;
   @override
-  Future<String> abrir(String lojaId) async => 'conv_1';
+  Future<String> abrir(String lojaId) async => conversation;
   @override
   Future<({List<MensagemModel> mensagens, bool last})> historico(
     String id,
@@ -100,6 +101,20 @@ void main() {
       await ApiConfig.limparSessao();
     },
   );
+  test('pendente fica vinculado à conversa ao trocar de loja', () async {
+    SharedPreferences.setMockInitialValues({});
+    final service = _ChatService();
+    final provider = ChatProvider(service: service, realtime: _Realtime());
+    addTearDown(provider.dispose);
+    await provider.abrir('primeira');
+    expect(provider.enviar('Só pertence à primeira'), true);
+    await Future<void>.delayed(Duration.zero);
+    service.conversation = 'conv_2';
+    await provider.abrir('segunda');
+    expect(provider.textoPendente, isNull);
+    expect(provider.idPendente, isNull);
+    expect(provider.enviando, false);
+  });
   test(
     'mensagens iguais são confirmadas pelo ID e reconexão refaz socket',
     () async {
@@ -111,6 +126,7 @@ void main() {
       expect(provider.erro, isNull);
 
       expect(provider.enviar('Olá'), true);
+      await Future<void>.delayed(Duration.zero);
       final first = realtime.sent.single['clientMessageId'] as String;
       provider.receber(
         MensagemModel.fromJson({
@@ -123,6 +139,7 @@ void main() {
       );
       expect(provider.enviando, false);
       expect(provider.enviar('Olá'), true);
+      await Future<void>.delayed(Duration.zero);
       expect(realtime.sent.last['clientMessageId'], isNot(first));
 
       await provider.tentarNovamente('loja');

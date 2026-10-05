@@ -33,8 +33,23 @@ class ChatProvider extends ChangeNotifier {
   String? get textoPendente => _pendingText;
   String? get idPendente => _pendingId;
   String? _pendingKey;
-  Future<void> _persistirPendente(String key, String value) async {
-    await (await SharedPreferences.getInstance()).setString(key, value);
+  Future<void> _storage = Future<void>.value();
+  Future<void> _persistirPendente(String key, String value) {
+    _storage = _storage.catchError((Object _) {}).then((_) async {
+      await (await SharedPreferences.getInstance()).setString(key, value);
+    });
+    return _storage;
+  }
+
+  Future<void> _removerConfirmado(String key, String id) {
+    _storage = _storage.catchError((Object _) {}).then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(key);
+      if (saved != null && (jsonDecode(saved) as Map)['id'] == id) {
+        await prefs.remove(key);
+      }
+    });
+    return _storage.catchError((Object _) {});
   }
 
   bool get envioSemConfirmacao => _pendingId != null && !enviando;
@@ -56,6 +71,7 @@ class ChatProvider extends ChangeNotifier {
     _page = 0;
     _pendingId = null;
     _pendingText = null;
+    _pendingKey = null;
     _pendingHistoryReset = false;
     _pendingResetCompletion?.complete();
     _pendingResetCompletion = null;
@@ -65,6 +81,11 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> abrir(String loja) async {
     final generation = ++_generation;
+    _timeout?.cancel();
+    _pendingId = null;
+    _pendingText = null;
+    _pendingKey = null;
+    enviando = false;
     realtime.dispose();
     _loadingHistory = false;
     _pendingHistoryReset = false;
@@ -89,10 +110,15 @@ class ChatProvider extends ChangeNotifier {
         );
         if (_disposed || generation != _generation) return;
         if (saved != null) {
-          final pending = jsonDecode(saved) as Map;
-          _pendingId = pending['id'] as String;
-          _pendingText = pending['text'] as String;
-          enviando = false;
+          try {
+            final pending = jsonDecode(saved) as Map;
+            _pendingId = pending['id'] as String;
+            _pendingText = pending['text'] as String;
+          } catch (_) {
+            _pendingId = null;
+            _pendingText = null;
+            // Um rascunho inválido não deve impedir a abertura da conversa.
+          }
         }
       }
       realtime.listen('/topic/conversas/$conversaId', (body) {
@@ -145,14 +171,13 @@ class ChatProvider extends ChangeNotifier {
     mensagens.add(m);
     if (notify) mensagens.sort((a, b) => a.enviadaEm.compareTo(b.enviadaEm));
     if (_pendingId != null && m.id == 'msg_$_pendingId') {
+      final confirmedId = _pendingId!;
       enviando = false;
       _pendingId = null;
       _pendingText = null;
       if (_pendingKey != null) {
         final key = _pendingKey!;
-        unawaited(
-          SharedPreferences.getInstance().then((prefs) => prefs.remove(key)),
-        );
+        unawaited(_removerConfirmado(key, confirmedId));
       }
       _timeout?.cancel();
       erro = null;
