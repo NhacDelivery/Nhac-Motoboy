@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+
 import '../controllers/chat_provider.dart';
 import '../controllers/user_provider.dart';
 import '../globals/theme_colors.dart';
@@ -15,16 +16,63 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
   final _provider = ChatProvider();
   final _text = TextEditingController();
+  final _scroll = ScrollController();
+  String? _submitted;
+  int _messageCount = 0;
+  Future<void> _abrir() async {
+    await _provider.abrir(widget.lojaId);
+    if (!mounted) return;
+    if (_provider.textoPendente != null) {
+      _submitted = _provider.textoPendente;
+      _text.text = _submitted!;
+    }
+  }
+
+  void _atualizar() {
+    if (!mounted) return;
+    if (_submitted != null && _provider.textoPendente == null) {
+      if (_text.text.trim() == _submitted) _text.clear();
+      _submitted = null;
+    }
+    final count = _provider.mensagens.length;
+    final nearEnd = !_scroll.hasClients || _scroll.position.extentAfter < 100;
+    if (count != _messageCount && (nearEnd || _messageCount == 0)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _scroll.hasClients)
+          _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      });
+    }
+    _messageCount = count;
+  }
+
+  Future<void> _anteriores() async {
+    final height = _scroll.hasClients ? _scroll.position.maxScrollExtent : 0.0;
+    final offset = _scroll.hasClients ? _scroll.offset : 0.0;
+    await _provider.carregar();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _scroll.hasClients) {
+        _scroll.jumpTo(
+          (offset + _scroll.position.maxScrollExtent - height).clamp(
+            0.0,
+            _scroll.position.maxScrollExtent,
+          ),
+        );
+      }
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    _provider.abrir(widget.lojaId);
+    _provider.addListener(_atualizar);
+    _abrir();
   }
 
   @override
   void dispose() {
+    _provider.removeListener(_atualizar);
     _provider.dispose();
+    _scroll.dispose();
     _text.dispose();
     super.dispose();
   }
@@ -91,12 +139,13 @@ class _ChatPageState extends State<ChatPage> {
                         ),
                       )
                     : ListView(
+                        controller: _scroll,
                         padding: EdgeInsets.all(16.r),
                         children: [
                           if (!p.ultima)
                             Center(
                               child: TextButton(
-                                onPressed: p.carregar,
+                                onPressed: _anteriores,
                                 style: TextButton.styleFrom(
                                   foregroundColor: AppColors.primaria,
                                 ),
@@ -121,19 +170,32 @@ class _ChatPageState extends State<ChatPage> {
                                       : Colors.white,
                                   borderRadius: BorderRadius.circular(16.r),
                                 ),
-                                child: Text(
-                                  m.conteudo,
-                                  style: TextStyle(
-                                    fontFamily: 'Roboto',
-                                    fontSize: 14.sp,
-                                    color: AppColors.texto,
-                                  ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      m.conteudo,
+                                      style: TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 14.sp,
+                                        color: AppColors.texto,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${m.enviadaEm.toLocal().hour.toString().padLeft(2, '0')}:${m.enviadaEm.toLocal().minute.toString().padLeft(2, '0')} • Enviada',
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
                         ],
                       ),
               ),
+              if (p.textoPendente != null)
+                Text(
+                  p.enviando ? 'Enviando…' : 'Envio pendente: tente novamente',
+                ),
               Padding(
                 padding: EdgeInsets.all(12.r),
                 child: Row(
@@ -177,7 +239,8 @@ class _ChatPageState extends State<ChatPage> {
                         onPressed: !p.connected || p.enviando
                             ? null
                             : () {
-                                if (p.enviar(_text.text)) _text.clear();
+                                final value = _text.text.trim();
+                                if (p.enviar(value)) _submitted = value;
                               },
                         icon: Icon(
                           p.enviando

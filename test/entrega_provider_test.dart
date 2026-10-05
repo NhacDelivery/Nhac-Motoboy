@@ -1,4 +1,5 @@
 import 'package:nhac_motoboy/models/estado_entregador_model.dart';
+
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
@@ -39,6 +40,7 @@ class FakeEntregaService extends EntregadorService {
     required String placaVeiculo,
     String? modeloVeiculo,
     String? corVeiculo,
+    String? cnh,
   }) async => profile(operational);
   @override
   Future<EntregadorCadastroModel?> obterPerfil() async =>
@@ -306,25 +308,22 @@ void main() {
       expect(provider.isCadastrado, true);
     },
   );
-  test(
-    'código inválido mantém corrida e detalhes sem repetir conclusão automaticamente',
-    () async {
-      service.current = active('SAIU_ENTREGA');
-      service.operational = 'EM_ENTREGA';
-      await provider.sincronizar();
-      service.finishError = const ApiException(
-        400,
-        'Código inválido.',
-        code: 'CODIGO_ENTREGA_INVALIDO',
-        details: {'tentativasRestantes': 4},
-      );
-      expect(await provider.concluirEntregaAtual(codigo: '0123'), false);
-      expect(service.finishCalls, 1);
-      expect(provider.entregaAtiva, isNotNull);
-      expect(provider.erroConclusao?.details, {'tentativasRestantes': 4});
-      expect(provider.podeConcluir, true);
-    },
-  );
+  test('código inválido mantém corrida e detalhes sem repetir conclusão automaticamente', () async {
+    service.current = active('SAIU_ENTREGA');
+    service.operational = 'EM_ENTREGA';
+    await provider.sincronizar();
+    service.finishError = const ApiException(
+      400,
+      'Código inválido.',
+      code: 'CODIGO_ENTREGA_INVALIDO',
+      details: {'tentativasRestantes': 4},
+    );
+    expect(await provider.concluirEntregaAtual(codigo: '0123'), false);
+    expect(service.finishCalls, 1);
+    expect(provider.entregaAtiva, isNotNull);
+    expect(provider.erroConclusao?.details, {'tentativasRestantes': 4});
+    expect(provider.podeConcluir, true);
+  });
   test('conclusão sem quatro dígitos não chama o servidor', () async {
     service.current = active('SAIU_ENTREGA');
     await provider.sincronizar();

@@ -52,11 +52,15 @@ class _ContinuarSenhaState extends State<ContinuarSenha> {
   /// errada, "logava com sucesso" — e como o token nunca era setado, toda
   /// chamada de API autenticada depois disso saía sem Authorization.
   Future<void> logar() async {
+    if (_isLoading) return;
     final email = context.read<CadastroController>().email;
     final senha = _senhaController.text;
 
     if (email.isEmpty) {
-      setState(() => _errorMessage = 'Sessão expirada. Volte e informe o e-mail novamente.');
+      setState(
+        () => _errorMessage =
+            'Sessão expirada. Volte e informe o e-mail novamente.',
+      );
       return;
     }
     if (senha.isEmpty) {

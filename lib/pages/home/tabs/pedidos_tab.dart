@@ -1,4 +1,5 @@
 import '../../../utils/formatters.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -184,6 +185,16 @@ class _PedidosTabState extends State<PedidosTab> {
                     ])
                       ChoiceChip(
                         label: Text(filtro.$2),
+                        selectedColor: AppColors.primaria,
+                        backgroundColor: Colors.white,
+                        labelStyle: const TextStyle(
+                          color: AppColors.texto,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20.r),
+                          side: const BorderSide(color: AppColors.bordaInativa),
+                        ),
                         selected: _statusFiltro == filtro.$1,
                         onSelected: (_) {
                           if (_statusFiltro == filtro.$1) return;
@@ -310,7 +321,9 @@ class _PedidosTabState extends State<PedidosTab> {
             SizedBox(height: 12.h),
             Text('Loja: ${item.lojaNome ?? 'Não informada'}'),
             Text('Status: ${item.status.label}'),
-            Text('Região da entrega: ${_regiao(item)}'),
+            Text(
+              'Endereço da entrega: ${item.enderecoEntrega?.formatado ?? _regiao(item)}',
+            ),
             Text('Criado em: ${_formatarData(item.criadoEm)}'),
             if (item.coletadoEm != null)
               Text('Coletado em: ${_formatarData(item.coletadoEm)}'),

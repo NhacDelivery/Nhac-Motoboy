@@ -1,3 +1,5 @@
+import '../services/push_service.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -54,6 +56,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
   bool _changingStatus = false, _pendingOffline = false, _routeLoading = false;
   Future<bool>? _offlineOperation;
   String? _routeRequestedFor;
+  bool erroRotaDados = false;
   DateTime? ultimaLocalizacaoEm, ultimaSincronizacaoEm;
   int entregasConcluidasRevision = 0;
   bool inicializado = false;
@@ -181,6 +184,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
           _rota = null;
           _routeRequestedFor = null;
           erroRota = null;
+          erroRotaDados = false;
           if (previous != null) {
             aviso = 'A corrida foi encerrada. Seu status foi atualizado.';
             entregasConcluidasRevision++;
@@ -266,12 +270,14 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     required String placaVeiculo,
     String? modeloVeiculo,
     String? corVeiculo,
+    String? cnh,
   }) => _atualizarPerfil(
     () => _service.atualizarVeiculo(
       tipoVeiculo: tipoVeiculo,
       placaVeiculo: placaVeiculo,
       modeloVeiculo: modeloVeiculo,
       corVeiculo: corVeiculo,
+      cnh: cnh,
     ),
   );
   Future<void> atualizarDocumentos({
@@ -451,8 +457,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
         },
         onError: (Object error) {
           if (!_valid(epoch)) return;
-          erroLocalizacao =
-              'Não foi possível acompanhar o GPS. Abra o app e atualize sua localização.';
+          erroLocalizacao = 'Não foi possível acompanhar o GPS. Abra o app e atualize sua localização.';
           _notify();
         },
       );
@@ -524,8 +529,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     };
     void disconnected() {
       if (!_foreground || !_valid(connectionEpoch)) return;
-      avisoConexao =
-          'Atualizações em tempo real indisponíveis. As corridas continuam sendo consultadas automaticamente.';
+      avisoConexao = 'Atualizações em tempo real indisponíveis. As corridas continuam sendo consultadas automaticamente.';
       // Recalcula o intervalo de recuperação sem esperar o próximo polling.
       _start();
       _notify();
@@ -599,8 +603,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
       onError: (e) {
         if (e is ApiException && [400, 404, 409, 422].contains(e.status)) {
           _ofertas.removeWhere((o) => o.id == id);
-          aviso =
-              'Esta oferta não está mais disponível. Ela pode ter expirado ou sido aceita por outro entregador.';
+          aviso = 'Esta oferta não está mais disponível. Ela pode ter expirado ou sido aceita por outro entregador.';
         }
       },
     );
@@ -630,9 +633,13 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
       if (_valid(epoch) && _entrega?.pedidoId == id) {
         _rota = route;
         erroRota = null;
+        erroRotaDados = false;
       }
     } catch (e) {
-      if (_valid(epoch)) erroRota = e.toString();
+      if (_valid(epoch)) {
+        erroRota = e.toString();
+        erroRotaDados = e is ApiException && e.status == 422;
+      }
     } finally {
       if (_valid(epoch)) {
         _routeLoading = false;
@@ -641,13 +648,29 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  Future<void> corrigirDestino(double latitude, double longitude) async {
+    final active = _entrega;
+    final epoch = _epoch;
+    if (active == null) throw StateError('Sem corrida ativa.');
+    await _service.corrigirDestino(active.pedidoId, latitude, longitude);
+    if (!_valid(epoch)) return;
+    await sincronizar();
+    if (!_valid(epoch)) return;
+    await carregarRota(active.pedidoId, tentarNovamente: true);
+  }
+
   Future<bool> confirmarColeta() async {
     if (!podeColetar) return false;
     final id = _entrega!.pedidoId;
     return _action(() async {
       final epoch = _epoch;
       final active = await _service.coletarPedido(id);
-      if (_valid(epoch)) _entrega = active;
+      if (_valid(epoch)) {
+        _entrega = active;
+        _rota = null;
+        _routeRequestedFor = null;
+        await carregarRota(id, tentarNovamente: true);
+      }
     });
   }
 
@@ -763,6 +786,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
         'Não foi possível ficar offline no servidor. Verifique a conexão e tente sair novamente.',
       );
     }
+    await PushService.shared.encerrar();
     await ApiConfig.limparSessao();
   }
 

@@ -69,7 +69,11 @@ class MotoboyInicio extends StatelessWidget {
           if (p.erro != null) _Notice(p.erro!, action: p.sincronizar),
           if (p.avisoConexao != null)
             _Notice(p.avisoConexao!, action: p.sincronizar),
-          if (p.aviso != null) _Notice(p.aviso!),
+          if (p.aviso != null)
+            Padding(
+              padding: EdgeInsets.only(bottom: 12.h),
+              child: _Notice(p.aviso!),
+            ),
           if (p.ultimaSincronizacaoEm != null)
             Semantics(
               liveRegion: true,
@@ -78,6 +82,7 @@ class MotoboyInicio extends StatelessWidget {
                 style: AppTextStyles.subtitulo(),
               ),
             ),
+          SizedBox(height: 16.h),
           if (p.inicializado && p.erro == null && !p.isCadastrado)
             NhacCard(
               child: InkWell(

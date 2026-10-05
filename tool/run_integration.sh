@@ -54,8 +54,20 @@ if ! grep -q MOTOBOY_INTEGRATION_FIXTURE_READY "$logs_dir/backend.log"; then
   exit 1
 fi
 cd "$app_dir"
+if [[ "${RUN_DEVICE:-false}" == "true" ]]; then
+  device="${DEVICE_ID:-emulator-5554}"
+  adb -s "$device" reverse tcp:18080 tcp:18080
+  adb -s "$device" emu geo fix -46.633308 -23.550520
+  "$flutter_bin" build apk --debug --dart-define=API_BASE_URL=http://127.0.0.1:18080
+  adb -s "$device" install -r build/app/outputs/flutter-apk/app-debug.apk
+  adb -s "$device" shell pm grant com.example.nhac_motoboy android.permission.ACCESS_FINE_LOCATION
+  adb -s "$device" shell pm grant com.example.nhac_motoboy android.permission.ACCESS_COARSE_LOCATION
+  "$flutter_bin" test integration_test/motoboy_device_test.dart -d "$device" --dart-define=API_BASE_URL=http://127.0.0.1:18080 2>&1 | tee "$logs_dir/device.log"
+else
 CI=true "$flutter_bin" --suppress-analytics --no-version-check test \
   test/integration/motoboy_backend_test.dart \
   --dart-define=RUN_INTEGRATION=true \
   --dart-define=API_BASE_URL=http://127.0.0.1:18080 \
   --reporter=expanded 2>&1 | tee "$logs_dir/flutter.log"
+
+fi

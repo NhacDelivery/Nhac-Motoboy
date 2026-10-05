@@ -60,7 +60,7 @@ public class MotoboyIntegrationFixture implements CommandLineRunner {
         u.setId("it-" + nome);
         u.setNome("Integração " + nome);
         u.setEmail(nome + "@integration.nhac.local");
-        u.setTelefone("+5511999990001");
+        u.setTelefone(String.format("+55119999%05d",Math.abs(nome.hashCode()%100000)));
         u.setSenha(encoder.encode("NhacIntegration#123"));
         u.setPapel(papel);
         u.setAtivo(true);

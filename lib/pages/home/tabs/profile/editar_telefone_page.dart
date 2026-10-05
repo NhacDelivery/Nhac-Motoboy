@@ -1,3 +1,6 @@
+import '../../../../services/auth_service.dart';
+import '../../../../utils/formatters.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
@@ -23,7 +26,9 @@ class _EditarTelefonePageState extends State<EditarTelefonePage> {
   late final MaskTextInputFormatter _phoneFormatter;
   bool _phoneValido = false;
   String? _erroPhone;
-  bool _isLoading = false;
+  bool _isLoading = false, _codigoEnviado = false;
+  final _codigo = TextEditingController();
+  final _auth = AuthService();
 
   @override
   void initState() {
@@ -32,9 +37,11 @@ class _EditarTelefonePageState extends State<EditarTelefonePage> {
     _phoneFormatter = MaskTextInputFormatter(
       mask: '(##) #####-####',
       filter: {'#': RegExp(r'[0-9]')},
-      initialText: phoneAtual,
+      initialText: telefoneNacional(phoneAtual),
     );
-    _phoneController = TextEditingController(text: _phoneFormatter.getMaskedText());
+    _phoneController = TextEditingController(
+      text: _phoneFormatter.getMaskedText(),
+    );
     _phoneController.addListener(_validarTelefone);
     _validarTelefone();
   }
@@ -43,6 +50,7 @@ class _EditarTelefonePageState extends State<EditarTelefonePage> {
   void dispose() {
     _phoneController.removeListener(_validarTelefone);
     _phoneController.dispose();
+    _codigo.dispose();
     super.dispose();
   }
 
@@ -58,11 +66,20 @@ class _EditarTelefonePageState extends State<EditarTelefonePage> {
   }
 
   Future<void> _salvarTelefone() async {
+    if (_isLoading) return;
     try {
       setState(() => _isLoading = true);
       if (!mounted) return;
 
-      await context.read<UserProvider>().atualizarTelefone(_phoneController.text.trim());
+      final telefone = telefoneE164(_phoneController.text);
+      if (!_codigoEnviado) {
+        await _auth.enviarCodigoTelefone(telefone);
+        if (mounted) setState(() => _codigoEnviado = true);
+        return;
+      }
+      final user = context.read<UserProvider>();
+      await user.service.confirmarTelefone(telefone, _codigo.text.trim());
+      await user.carregarDadosReais(force: true);
 
       if (!mounted) return;
       context.showSuccess('Telefone atualizado com sucesso!');
@@ -83,7 +100,11 @@ class _EditarTelefonePageState extends State<EditarTelefonePage> {
         backgroundColor: AppColors.fundo,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF5D201C), size: 20),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Color(0xFF5D201C),
+            size: 20,
+          ),
           onPressed: () => context.pop(),
         ),
       ),
@@ -121,8 +142,10 @@ class _EditarTelefonePageState extends State<EditarTelefonePage> {
                         ),
                       ),
                       SizedBox(height: 28.h),
+                      const Text('Código do país: +55'),
                       NhacInputField(
                         controller: _phoneController,
+                        enabled: !_codigoEnviado && !_isLoading,
                         inputFormatters: [_phoneFormatter],
                         keyboardType: TextInputType.phone,
                         errorText: _erroPhone,
@@ -135,15 +158,42 @@ class _EditarTelefonePageState extends State<EditarTelefonePage> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                      if (_codigoEnviado) ...[
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _codigo,
+                          keyboardType: TextInputType.number,
+                          maxLength: 6,
+                          decoration: const InputDecoration(
+                            labelText: 'Código recebido por SMS',
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _isLoading
+                              ? null
+                              : () => setState(() {
+                                  _codigoEnviado = false;
+                                  _codigo.clear();
+                                }),
+                          child: const Text('Alterar número'),
+                        ),
+                      ],
                     ],
                   ),
                 ),
               ),
             ),
             Padding(
-              padding: EdgeInsets.only(left: 24.w, right: 24.w, bottom: 32.h, top: 16.h),
+              padding: EdgeInsets.only(
+                left: 24.w,
+                right: 24.w,
+                bottom: 32.h,
+                top: 16.h,
+              ),
               child: BotaoLargoNhac(
-                texto: 'Salvar alterações',
+                texto: _codigoEnviado
+                    ? 'Confirmar novo telefone'
+                    : 'Enviar código por SMS',
                 carregando: _isLoading,
                 onPressed: _phoneValido ? _salvarTelefone : null,
               ),

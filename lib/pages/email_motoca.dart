@@ -67,7 +67,7 @@ class _EmailMotocaPageState extends State<EmailMotocaPage> {
 
   Future<void> _avancarParaSenha() async {
     final email = _emailController.text.trim();
-    if (!_emailValido) return;
+    if (!_emailValido || _isLoading || _isGoogleLoading) return;
 
     setState(() => _isLoading = true);
 
@@ -103,24 +103,33 @@ class _EmailMotocaPageState extends State<EmailMotocaPage> {
   }
 
   Future<void> _fazerLoginGoogle() async {
-    if (_isGoogleLoading) return;
+    if (_isGoogleLoading || _isLoading) return;
     setState(() => _isGoogleLoading = true);
     try {
       const webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
       if (webClientId.isEmpty) {
-        throw StateError('Login Google sem configuração. Informe GOOGLE_WEB_CLIENT_ID na compilação.');
+        throw StateError(
+          'Login Google sem configuração. Informe GOOGLE_WEB_CLIENT_ID na compilação.',
+        );
       }
       final google = GoogleSignIn.instance;
       _googleInitialization ??= google.initialize(serverClientId: webClientId);
       await _googleInitialization;
       final account = await google.authenticate();
       final idToken = account.authentication.idToken;
-      if (idToken == null) throw StateError('O Google não retornou um token de identidade.');
+      if (idToken == null)
+        throw StateError('O Google não retornou um token de identidade.');
       final token = await _authService.loginComGoogle(idToken);
       await ApiConfig.setAuthToken(token);
       if (mounted) context.go('/home-motoca');
+    } on GoogleSignInException catch (e) {
+      if (e.code != GoogleSignInExceptionCode.canceled && mounted)
+        context.showError(
+          'Não foi possível entrar com Google. Tente novamente.',
+        );
     } catch (e) {
-      if (mounted) context.showError(e.toString().replaceFirst('Bad state: ', ''));
+      if (mounted)
+        context.showError(e.toString().replaceFirst('Bad state: ', ''));
     } finally {
       if (mounted) setState(() => _isGoogleLoading = false);
     }
@@ -145,10 +154,7 @@ class _EmailMotocaPageState extends State<EmailMotocaPage> {
                     children: [
                       const SetaVoltar(),
                       SizedBox(height: 20.h),
-                      Text(
-                        'Qual o seu email?',
-                        style: AppTextStyles.titulo(),
-                      ),
+                      Text('Qual o seu email?', style: AppTextStyles.titulo()),
                       SizedBox(height: 8.h),
                       Text(
                         'Precisamos dele para iniciar o seu cadastro ou aceder ao aplicativo.',
@@ -172,7 +178,9 @@ class _EmailMotocaPageState extends State<EmailMotocaPage> {
                           separatorBuilder: (_, _) => SizedBox(width: 8.w),
                           itemBuilder: (context, index) => ActionChip(
                             label: Text(_dominios[index]),
-                            backgroundColor: AppColors.secundaria.withValues(alpha: 0.4),
+                            backgroundColor: AppColors.secundaria.withValues(
+                              alpha: 0.4,
+                            ),
                             labelStyle: TextStyle(
                               fontFamily: 'Roboto',
                               color: AppColors.texto,
@@ -197,9 +205,10 @@ class _EmailMotocaPageState extends State<EmailMotocaPage> {
                                     '$prefixo${_dominios[index]}';
                                 _emailController.selection =
                                     TextSelection.fromPosition(
-                                  TextPosition(
-                                      offset: _emailController.text.length),
-                                );
+                                      TextPosition(
+                                        offset: _emailController.text.length,
+                                      ),
+                                    );
                               }
                             },
                           ),

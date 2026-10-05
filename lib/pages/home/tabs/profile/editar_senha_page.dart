@@ -19,7 +19,8 @@ class EditarSenhaPage extends StatefulWidget {
 class _EditarSenhaPageState extends State<EditarSenhaPage> {
   final TextEditingController _senhaAtualController = TextEditingController();
   final TextEditingController _novaSenhaController = TextEditingController();
-  final TextEditingController _confirmarSenhaController = TextEditingController();
+  final TextEditingController _confirmarSenhaController =
+      TextEditingController();
 
   bool _isLoading = false;
   bool _formValido = false;
@@ -73,7 +74,8 @@ class _EditarSenhaPageState extends State<EditarSenhaPage> {
         _erroConfirmarSenha = null;
       }
 
-      _formValido = _erroSenhaAtual == null &&
+      _formValido =
+          _erroSenhaAtual == null &&
           _erroNovaSenha == null &&
           _erroConfirmarSenha == null &&
           senhaAtual.isNotEmpty &&
@@ -87,7 +89,10 @@ class _EditarSenhaPageState extends State<EditarSenhaPage> {
       setState(() => _isLoading = true);
       if (!mounted) return;
 
-      await context.read<UserProvider>().atualizarSenha(_senhaAtualController.text, _novaSenhaController.text);
+      await context.read<UserProvider>().atualizarSenha(
+        _senhaAtualController.text,
+        _novaSenhaController.text,
+      );
 
       if (!mounted) return;
       context.showSuccess('Senha alterada com sucesso!');
@@ -102,13 +107,49 @@ class _EditarSenhaPageState extends State<EditarSenhaPage> {
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<UserProvider>();
+    if (user.temSenha == false) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Senha da conta')),
+        body: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Você entra por SMS ou Google',
+                style: AppTextStyles.titulo(),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Sua conta ainda não possui senha local. Continue usando o mesmo método de acesso. Para definir uma senha, confirme um código enviado ao seu e-mail cadastrado.',
+              ),
+              if (user.email.isNotEmpty)
+                FilledButton(
+                  onPressed: () => context.push('/recuperar-senha-conta'),
+                  child: const Text('Definir senha por e-mail'),
+                ),
+              if (user.email.isEmpty)
+                TextButton(
+                  onPressed: () => context.push('/editar-email'),
+                  child: const Text('Cadastrar e-mail'),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: AppColors.fundo,
       appBar: AppBar(
         backgroundColor: AppColors.fundo,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF5D201C), size: 20),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Color(0xFF5D201C),
+            size: 20,
+          ),
           onPressed: () => context.pop(),
         ),
       ),
@@ -163,10 +204,14 @@ class _EditarSenhaPageState extends State<EditarSenhaPage> {
                         hintText: 'Digite sua senha atual',
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _mostrarSenhaAtual ? Icons.visibility : Icons.visibility_off,
+                            _mostrarSenhaAtual
+                                ? Icons.visibility
+                                : Icons.visibility_off,
                             color: const Color(0xFF5D201C),
                           ),
-                          onPressed: () => setState(() => _mostrarSenhaAtual = !_mostrarSenhaAtual),
+                          onPressed: () => setState(
+                            () => _mostrarSenhaAtual = !_mostrarSenhaAtual,
+                          ),
                         ),
                       ),
                       SizedBox(height: 20.h),
@@ -187,10 +232,14 @@ class _EditarSenhaPageState extends State<EditarSenhaPage> {
                         hintText: 'Digite a nova senha',
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _mostrarNovaSenha ? Icons.visibility : Icons.visibility_off,
+                            _mostrarNovaSenha
+                                ? Icons.visibility
+                                : Icons.visibility_off,
                             color: const Color(0xFF5D201C),
                           ),
-                          onPressed: () => setState(() => _mostrarNovaSenha = !_mostrarNovaSenha),
+                          onPressed: () => setState(
+                            () => _mostrarNovaSenha = !_mostrarNovaSenha,
+                          ),
                         ),
                       ),
                       SizedBox(height: 20.h),
@@ -211,10 +260,14 @@ class _EditarSenhaPageState extends State<EditarSenhaPage> {
                         hintText: 'Repita a nova senha',
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _mostrarConfirmar ? Icons.visibility : Icons.visibility_off,
+                            _mostrarConfirmar
+                                ? Icons.visibility
+                                : Icons.visibility_off,
                             color: const Color(0xFF5D201C),
                           ),
-                          onPressed: () => setState(() => _mostrarConfirmar = !_mostrarConfirmar),
+                          onPressed: () => setState(
+                            () => _mostrarConfirmar = !_mostrarConfirmar,
+                          ),
                         ),
                       ),
                     ],
@@ -223,7 +276,12 @@ class _EditarSenhaPageState extends State<EditarSenhaPage> {
               ),
             ),
             Padding(
-              padding: EdgeInsets.only(left: 24.w, right: 24.w, bottom: 32.h, top: 16.h),
+              padding: EdgeInsets.only(
+                left: 24.w,
+                right: 24.w,
+                bottom: 32.h,
+                top: 16.h,
+              ),
               child: BotaoLargoNhac(
                 texto: 'Salvar alterações',
                 carregando: _isLoading,

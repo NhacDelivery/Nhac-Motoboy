@@ -1,3 +1,5 @@
+import 'services/push_service.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -17,6 +19,7 @@ void main() async {
   // inicial com ApiConfig.authToken ainda nulo mesmo que a pessoa já
   // estivesse logada, e ela cairia sempre na tela de boas-vindas.
   await ApiConfig.init();
+  await PushService.shared.init();
 
   runApp(
     MultiProvider(

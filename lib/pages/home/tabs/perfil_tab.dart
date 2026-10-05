@@ -1,3 +1,6 @@
+import 'avisos_page.dart';
+import 'suporte_entrega_page.dart';
+
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -29,7 +32,10 @@ class PerfilTab extends StatelessWidget {
             children: [
               _CircleIcon(
                 icon: Icons.notifications_none,
-                onTap: () => _showNotices(context, delivery),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AvisosPage()),
+                ),
               ),
               Text(
                 'Perfil',
@@ -141,7 +147,7 @@ class PerfilTab extends StatelessWidget {
                     Text(
                       profile == null
                           ? 'Complete seu cadastro de entregador'
-                          : '${profile.modeloVeiculo?.isNotEmpty == true ? profile.modeloVeiculo : profile.tipoVeiculo ?? 'Veículo'} • Placa ${profile.placaVeiculo ?? '—'}',
+                          : '${profile.modeloVeiculo?.isNotEmpty == true ? profile.modeloVeiculo : profile.tipoVeiculo ?? 'Veículo'}${profile.tipoVeiculo == 'BICICLETA' ? '' : ' • Placa ${profile.placaVeiculo ?? '—'}'}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -180,12 +186,6 @@ class PerfilTab extends StatelessWidget {
                 onTap: () => context.push('/editar-nome'),
               ),
               _AccountRow(
-                icon: Icons.photo_camera_outlined,
-                title: 'Foto de Perfil',
-                subtitle: 'Alterar foto',
-                onTap: () => context.push('/editar-foto'),
-              ),
-              _AccountRow(
                 icon: Icons.mail_outline,
                 title: 'E-mail',
                 subtitle: user.email,
@@ -199,10 +199,10 @@ class PerfilTab extends StatelessWidget {
               ),
               _AccountRow(
                 icon: Icons.two_wheeler_outlined,
-                title: 'Veículo & Moto',
+                title: 'Veículo',
                 subtitle: profile == null
                     ? 'Toque para cadastrar seu veículo'
-                    : '${profile.modeloVeiculo?.isNotEmpty == true ? profile.modeloVeiculo : profile.tipoVeiculo ?? 'Veículo'} • Placa ${profile.placaVeiculo ?? '—'}',
+                    : '${profile.modeloVeiculo?.isNotEmpty == true ? profile.modeloVeiculo : profile.tipoVeiculo ?? 'Veículo'}${profile.tipoVeiculo == 'BICICLETA' ? '' : ' • Placa ${profile.placaVeiculo ?? '—'}'}',
                 onTap: () => context.push(
                   profile == null ? '/cadastro-motoboy' : '/editar-veiculo',
                 ),
@@ -216,7 +216,9 @@ class PerfilTab extends StatelessWidget {
                 ),
                 _AccountRow(
                   icon: Icons.badge_outlined,
-                  title: 'Documentos (CPF & CNH)',
+                  title: profile.tipoVeiculo == 'BICICLETA'
+                      ? 'Documento (CPF)'
+                      : 'Documentos (CPF & CNH)',
                   subtitle: 'Consultar e atualizar',
                   onTap: () => context.push('/editar-documentos'),
                 ),
@@ -246,20 +248,26 @@ class PerfilTab extends StatelessWidget {
                 icon: Icons.help_outline,
                 title: 'Ajuda durante a entrega',
                 subtitle: 'Orientações e contato com a loja',
-                onTap: () => _showHelp(context, delivery),
+                onTap: () {
+                  final active = delivery.entregaAtiva;
+                  if (active != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            SuporteEntregaPage(pedidoId: active.pedidoId),
+                      ),
+                    );
+                  } else {
+                    _showHelp(context, delivery);
+                  }
+                },
               ),
               _AccountRow(
                 icon: Icons.lock_outline,
                 title: 'Alterar senha',
                 subtitle: 'Atualizar senha da conta',
                 onTap: () => context.push('/editar-senha'),
-              ),
-              _AccountRow(
-                icon: Icons.logout,
-                title: 'Sair da conta',
-                subtitle: 'Desconectar deste celular',
-                key: const Key('logout-button'),
-                onTap: () => _sair(context, delivery),
               ),
             ],
           ),
@@ -279,118 +287,93 @@ class PerfilTab extends StatelessWidget {
   );
 
   Future<void> _sair(BuildContext context, EntregaProvider delivery) async {
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Tem certeza que deseja sair da conta?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sair'),
+          ),
+        ],
+      ),
+    );
+    if (confirmado != true || !context.mounted) return;
     try {
       await delivery.sair();
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
       }
     }
   }
 
-  void _showNotices(
-    BuildContext context,
-    EntregaProvider delivery,
-  ) => showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    builder: (ctx) => SafeArea(
-      child: Padding(
-        padding: EdgeInsets.all(24.r),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _sectionTitle('Avisos recentes'),
-            SizedBox(height: 12.h),
-            Text(
-              'Avisos recebidos enquanto o aplicativo está aberto.',
-              style: AppTextStyles.subtitulo(),
-            ),
-            SizedBox(height: 16.h),
-            if (delivery.avisosRecentes.isEmpty)
-              Text(
-                'Nenhuma oferta ou atualização de corrida recebida nesta sessão.',
-                style: AppTextStyles.subtitulo(),
-              ),
-            for (final aviso in delivery.avisosRecentes.take(5))
-              ListTile(
-                leading: const Icon(Icons.notifications_active_outlined),
-                title: Text(aviso.texto),
-                subtitle: Text(
-                  '${aviso.hora.hour.toString().padLeft(2, '0')}:${aviso.hora.minute.toString().padLeft(2, '0')}',
+  void _showHelp(BuildContext context, EntregaProvider delivery) =>
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
+        ),
+        builder: (ctx) => SafeArea(
+          child: Padding(
+            padding: EdgeInsets.all(24.r),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _sectionTitle('Ajuda'),
+                SizedBox(height: 16.h),
+                Text(
+                  'Para receber ofertas, mantenha o GPS ligado, permita o acesso à localização e ative a disponibilidade na home.',
+                  style: AppTextStyles.subtitulo(),
                 ),
-              ),
-          ],
+                SizedBox(height: 12.h),
+                Text(
+                  'Os ganhos e o histórico de corridas ficam nas abas inferiores. Durante uma entrega, abra a rota pela home ou por Pedidos.',
+                  style: AppTextStyles.subtitulo(),
+                ),
+                SizedBox(height: 12.h),
+                Text(
+                  'Se não conseguir realizar uma corrida, converse com a loja antes da coleta. Após a coleta, preserve o pedido e combine uma solução com a loja; ainda não há retirada automática da corrida.',
+                  style: AppTextStyles.subtitulo(),
+                ),
+                if (delivery.entregaAtiva?.lojaId != null) ...[
+                  SizedBox(height: 12.h),
+                  FilledButton.icon(
+                    onPressed: () {
+                      final active = delivery.entregaAtiva!;
+                      Navigator.pop(ctx);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChatPage(
+                            lojaId: active.lojaId!,
+                            lojaNome: active.lojaNome,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.chat_outlined),
+                    label: const Text('Conversar com a loja'),
+                  ),
+                ],
+                SizedBox(height: 20.h),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Fechar'),
+                ),
+              ],
+            ),
+          ),
         ),
-      ),
-    ),
-  );
-
-  void _showHelp(
-    BuildContext context,
-    EntregaProvider delivery,
-  ) => showModalBottomSheet(
-    context: context,
-    backgroundColor: Colors.white,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
-    ),
-    builder: (ctx) => SafeArea(
-      child: Padding(
-        padding: EdgeInsets.all(24.r),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _sectionTitle('Ajuda'),
-            SizedBox(height: 16.h),
-            Text(
-              'Para receber ofertas, mantenha o GPS ligado, permita o acesso à localização e ative a disponibilidade na home.',
-              style: AppTextStyles.subtitulo(),
-            ),
-            SizedBox(height: 12.h),
-            Text(
-              'Os ganhos e o histórico de corridas ficam nas abas inferiores. Durante uma entrega, abra a rota pela home ou por Pedidos.',
-              style: AppTextStyles.subtitulo(),
-            ),
-            SizedBox(height: 12.h),
-            Text(
-              'Se não conseguir realizar uma corrida, converse com a loja antes da coleta. Após a coleta, preserve o pedido e combine uma solução com a loja; ainda não há retirada automática da corrida.',
-              style: AppTextStyles.subtitulo(),
-            ),
-            if (delivery.entregaAtiva?.lojaId != null) ...[
-              SizedBox(height: 12.h),
-              FilledButton.icon(
-                onPressed: () {
-                  final active = delivery.entregaAtiva!;
-                  Navigator.pop(ctx);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ChatPage(
-                        lojaId: active.lojaId!,
-                        lojaNome: active.lojaNome,
-                      ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.chat_outlined),
-                label: const Text('Conversar com a loja'),
-              ),
-            ],
-            SizedBox(height: 20.h),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Fechar'),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
+      );
 
   void _accountOptions(BuildContext context, EntregaProvider delivery) {
     showModalBottomSheet(

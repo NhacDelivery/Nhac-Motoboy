@@ -315,7 +315,7 @@ void main() {
           hasLength(1),
         );
         expect(history.itens.single.entregueEm, isNotNull);
-        expect(history.itens.single.enderecoEntrega, isNull);
+        expect(history.itens.single.enderecoEntrega, isNotNull);
         final estado = await service.obterEstado();
         expect(estado.entrega, isNull);
         expect(estado.perfil!.statusOperacional, 'ONLINE');

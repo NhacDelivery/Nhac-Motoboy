@@ -1,7 +1,11 @@
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+
 import '../models/mensagem_model.dart';
 import '../services/chat_service.dart';
 import '../services/realtime_service.dart';
@@ -26,6 +30,13 @@ class ChatProvider extends ChangeNotifier {
   int _page = 0;
   Timer? _timeout;
   String? _pendingId, _pendingText;
+  String? get textoPendente => _pendingText;
+  String? get idPendente => _pendingId;
+  String? _pendingKey;
+  Future<void> _persistirPendente(String key, String value) async {
+    await (await SharedPreferences.getInstance()).setString(key, value);
+  }
+
   bool get envioSemConfirmacao => _pendingId != null && !enviando;
   bool get connected => realtime.connected;
   void _notify() {
@@ -69,6 +80,21 @@ class ChatProvider extends ChangeNotifier {
       final id = await service.abrir(loja);
       if (_disposed || generation != _generation) return;
       conversaId = id;
+      _pendingKey = ApiConfig.usuarioId == null
+          ? null
+          : 'chat_pending_${ApiConfig.usuarioId}_$id';
+      if (_pendingKey != null) {
+        final saved = (await SharedPreferences.getInstance()).getString(
+          _pendingKey!,
+        );
+        if (_disposed || generation != _generation) return;
+        if (saved != null) {
+          final pending = jsonDecode(saved) as Map;
+          _pendingId = pending['id'] as String;
+          _pendingText = pending['text'] as String;
+          enviando = false;
+        }
+      }
       realtime.listen('/topic/conversas/$conversaId', (body) {
         try {
           final m = MensagemModel.fromJson(jsonDecode(body));
@@ -122,6 +148,12 @@ class ChatProvider extends ChangeNotifier {
       enviando = false;
       _pendingId = null;
       _pendingText = null;
+      if (_pendingKey != null) {
+        final key = _pendingKey!;
+        unawaited(
+          SharedPreferences.getInstance().then((prefs) => prefs.remove(key)),
+        );
+      }
       _timeout?.cancel();
       erro = null;
     }
@@ -212,28 +244,44 @@ class ChatProvider extends ChangeNotifier {
   }
 
   bool _enviarComId(String value, String id) {
+    _pendingId = id;
+    _pendingText = value;
+    enviando = true;
+    erro = null;
+    final generation = _generation;
+    unawaited(_persistirEEnviar(value, id, generation));
+    _notify();
+    return true;
+  }
+
+  Future<void> _persistirEEnviar(
+    String value,
+    String id,
+    int generation,
+  ) async {
     try {
+      if (_pendingKey != null) {
+        await _persistirPendente(
+          _pendingKey!,
+          jsonEncode({'id': id, 'text': value}),
+        );
+      }
+      if (_disposed || generation != _generation) return;
       realtime.send('/app/conversas/$conversaId/enviar', {
         'conteudo': value,
         'clientMessageId': id,
       });
-      _pendingId = id;
-      _pendingText = value;
-      enviando = true;
-      erro = null;
       _timeout?.cancel();
       _timeout = Timer(const Duration(seconds: 15), () {
         enviando = false;
-        erro =
-            'Confirmação incerta. Atualize o histórico e, se necessário, reenvie a mesma mensagem.';
+        erro = 'Mensagem sem confirmação. Consulte o histórico ou reenvie a mesma mensagem.';
         _notify();
       });
-      _notify();
-      return true;
     } catch (e) {
+      if (_disposed || generation != _generation) return;
+      enviando = false;
       erro = e.toString();
       _notify();
-      return false;
     }
   }
 
