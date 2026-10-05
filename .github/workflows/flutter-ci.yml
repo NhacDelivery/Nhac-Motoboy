@@ -73,6 +73,16 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      - name: Dependências resolvidas e imagens de falhas dos testes
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: motoboy-test-results
+          path: |
+            pubspec.lock
+            test/failures/**
+          if-no-files-found: warn
+          retention-days: 7
       - run: flutter build web --release --dart-define=API_BASE_URL=https://backend-nhac.onrender.com
       - name: APK com autenticação Google e configuração de push
         run: >-

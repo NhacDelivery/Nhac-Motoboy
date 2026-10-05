@@ -25,7 +25,14 @@ void main() {
       Future<void> until(bool Function() ready) async {
         final end = DateTime.now().add(const Duration(seconds: 45));
         while (!ready()) {
-          if (DateTime.now().isAfter(end)) fail('Etapa não concluída em 45s.');
+          if (DateTime.now().isAfter(end)) {
+            final textos = tester.allWidgets
+                .whereType<Text>()
+                .map((w) => w.data ?? w.textSpan?.toPlainText() ?? '')
+                .toList();
+            debugPrint('DEVICE_TIMEOUT_UI: $textos');
+            fail('Etapa não concluída em 45s. Consulte DEVICE_TIMEOUT_UI.');
+          }
           await tester.pump(const Duration(milliseconds: 250));
         }
       }
@@ -33,6 +40,7 @@ void main() {
       Future<void> tap(Finder finder) async {
         await until(() => finder.evaluate().isNotEmpty);
         await tester.ensureVisible(finder.first);
+        await tester.pump();
         await tester.tap(finder.first);
         await tester.pump();
       }
@@ -41,6 +49,7 @@ void main() {
         await until(() => finder.evaluate().isNotEmpty);
         await tester.ensureVisible(finder.first);
         await tester.enterText(finder.first, text);
+        await tester.pump();
       }
 
       final client = http.Client();
@@ -62,7 +71,7 @@ void main() {
       }
 
       await ApiConfig.limparSessao();
-      app.main();
+      await app.main();
       await tester.pump();
       await tap(find.text('Começar'));
       await enter(

@@ -11,7 +11,7 @@ import 'globals/router.dart';
 import 'globals/app_theme.dart';
 import 'services/api_config.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Restaura o token de sessão salvo (SharedPreferences) antes de montar o
