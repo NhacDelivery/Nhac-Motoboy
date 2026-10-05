@@ -7,6 +7,7 @@ import '../../../../components/botoes/botao_largo_nhac.dart';
 import '../../../../controllers/user_provider.dart';
 import '../../../../globals/theme_colors.dart';
 import '../../../../globals/ui_utils.dart';
+import '../../../../services/push_service.dart';
 
 class NotificacoesPage extends StatefulWidget {
   const NotificacoesPage({super.key});
@@ -24,6 +25,7 @@ class _NotificacoesPageState extends State<NotificacoesPage> {
   Map<String, bool>? _values;
   bool _loading = true;
   bool _saving = false;
+  bool _registeringPush = false;
   String? _error;
 
   @override
@@ -51,6 +53,28 @@ class _NotificacoesPageState extends State<NotificacoesPage> {
       if (mounted) setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _registerPush() async {
+    if (_registeringPush) return;
+    setState(() => _registeringPush = true);
+    try {
+      await PushService.shared.registrar();
+      if (!mounted) return;
+      final erro = PushService.shared.erro;
+      if (erro != null) {
+        context.showError(erro);
+      } else if (PushService.shared.registrado) {
+        context.showSuccess('Notificações ativadas neste aparelho.');
+      }
+    } catch (_) {
+      if (mounted)
+        context.showError(
+          'Não foi possível ativar os avisos. Tente novamente.',
+        );
+    } finally {
+      if (mounted) setState(() => _registeringPush = false);
     }
   }
 
@@ -92,9 +116,44 @@ class _NotificacoesPageState extends State<NotificacoesPage> {
                 Text('Notificações', style: AppTextStyles.titulo()),
                 SizedBox(height: 12.h),
                 Text(
-                  'Ofertas e mensagens respeitam estas preferências. A disponibilidade é encerrada ao sair do aplicativo; ofertas deixam de chegar quando você fica offline. Mensagens podem chegar em segundo plano quando os avisos do aparelho estão configurados. Atualizações essenciais da corrida permanecem visíveis.',
+                  'Avisos de novas ofertas e mensagens respeitam estas preferências. A disponibilidade é encerrada ao sair do aplicativo; ofertas deixam de chegar quando você fica offline. Mensagens podem chegar em segundo plano quando os avisos do aparelho estão configurados. Atualizações essenciais da corrida permanecem visíveis.',
                   style: AppTextStyles.subtitulo(),
                 ),
+                SizedBox(height: 16.h),
+                if (PushService.shared.ativo) ...[
+                  Text(
+                    PushService.shared.registrado
+                        ? 'Notificações ativadas neste aparelho.'
+                        : 'Ative as notificações para receber mensagens em segundo plano.',
+                    style: AppTextStyles.subtitulo(),
+                  ),
+                  if (PushService.shared.erro != null)
+                    Text(
+                      PushService.shared.erro!,
+                      style: AppTextStyles.subtitulo(),
+                    ),
+                  TextButton(
+                    onPressed: _registeringPush ? null : _registerPush,
+                    child: _registeringPush
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.primaria,
+                            ),
+                          )
+                        : Text(
+                            PushService.shared.registrado
+                                ? 'Verificar notificações do aparelho'
+                                : 'Ativar notificações no aparelho',
+                          ),
+                  ),
+                ] else if (PushService.shared.erro != null)
+                  Text(
+                    PushService.shared.erro!,
+                    style: AppTextStyles.subtitulo(),
+                  ),
                 SizedBox(height: 28.h),
                 if (_loading)
                   const Center(

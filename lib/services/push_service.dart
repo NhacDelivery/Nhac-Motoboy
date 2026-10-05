@@ -20,6 +20,7 @@ class PushService {
   Map<String, dynamic>? _initial;
   String? erro;
   bool ativo = false;
+  bool registrado = false;
   Future<void> init() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
     const apiKey = String.fromEnvironment('FIREBASE_API_KEY');
@@ -80,7 +81,10 @@ class PushService {
     if (!ApiConfig.temSessaoSalva) return;
     try {
       await UserService().atualizar({'fcmToken': token});
+      registrado = true;
+      erro = null;
     } catch (_) {
+      registrado = false;
       erro = 'Não foi possível registrar as notificações. Abra as preferências para tentar novamente.';
     }
   }
@@ -94,6 +98,7 @@ class PushService {
       );
     } else {
       _initial = null;
+      registrado = false;
       unawaited(
         FirebaseMessaging.instance.deleteToken().catchError((Object _) {}),
       );
@@ -104,15 +109,23 @@ class PushService {
     if (!ativo || !ApiConfig.temSessaoSalva) return;
     final settings = await FirebaseMessaging.instance.requestPermission();
     if (settings.authorizationStatus == AuthorizationStatus.denied) {
+      registrado = false;
       erro =
           'Permita notificações nos ajustes do aparelho para receber avisos.';
       return;
     }
     final token = await FirebaseMessaging.instance.getToken();
-    if (token != null) await _register(token);
+    if (token != null) {
+      await _register(token);
+    } else {
+      registrado = false;
+      erro =
+          'Não foi possível ativar os avisos neste aparelho. Tente novamente.';
+    }
   }
 
   Future<void> encerrar() async {
+    registrado = false;
     if (!ativo) return;
     try {
       await UserService().atualizar({'fcmToken': ''});
