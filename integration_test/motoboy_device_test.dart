@@ -62,7 +62,7 @@ void main() {
       }
 
       await ApiConfig.limparSessao();
-      await app.main();
+      app.main();
       await tester.pump();
       await tap(find.text('Começar'));
       await enter(

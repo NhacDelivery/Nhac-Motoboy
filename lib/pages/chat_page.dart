@@ -38,8 +38,9 @@ class _ChatPageState extends State<ChatPage> {
     final nearEnd = !_scroll.hasClients || _scroll.position.extentAfter < 100;
     if (count != _messageCount && (nearEnd || _messageCount == 0)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _scroll.hasClients)
+        if (mounted && _scroll.hasClients) {
           _scroll.jumpTo(_scroll.position.maxScrollExtent);
+        }
       });
     }
     _messageCount = count;

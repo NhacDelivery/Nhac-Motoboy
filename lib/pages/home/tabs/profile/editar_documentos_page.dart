@@ -52,8 +52,9 @@ class _EditarDocumentosPageState extends State<EditarDocumentosPage> {
       context.showSuccess('Documentos atualizados com sucesso!');
       context.pop();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         context.showError(e.toString().replaceFirst('Bad state: ', ''));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }

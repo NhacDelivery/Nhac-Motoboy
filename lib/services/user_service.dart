@@ -36,8 +36,9 @@ class UserService {
       '/api/v1/usuarios/${Uri.encodeComponent(userId)}',
       body: fields,
     );
-    if (data is Map && data['token'] is String)
+    if (data is Map && data['token'] is String) {
       await ApiConfig.setAuthToken(data['token']);
+    }
   }
 
   Future<String> enviarFotoPerfil(File imagem) async {
@@ -76,16 +77,18 @@ class UserService {
       final response = await (() async => http.Response.fromStream(
         await client.send(request),
       ))().timeout(const Duration(seconds: 25));
-      if (token != ApiConfig.authToken)
+      if (token != ApiConfig.authToken) {
         throw StateError('Sessão alterada durante o envio.');
+      }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw StateError(
           'Não foi possível enviar a foto (${response.statusCode}).',
         );
       }
       final url = (jsonDecode(response.body) as Map)['url']?.toString();
-      if (url == null || url.isEmpty)
+      if (url == null || url.isEmpty) {
         throw StateError('Resposta inválida ao enviar a foto.');
+      }
       return url;
     } finally {
       client.close();

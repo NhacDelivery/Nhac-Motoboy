@@ -24,8 +24,9 @@ class _ChatService extends ChatService {
     int page,
   ) async {
     historyCalls++;
-    if (historyGate != null && historyCalls == gatedCall)
+    if (historyGate != null && historyCalls == gatedCall) {
       await historyGate!.future;
+    }
     return (mensagens: <MensagemModel>[], last: true);
   }
 

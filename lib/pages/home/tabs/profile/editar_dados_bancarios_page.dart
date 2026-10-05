@@ -82,8 +82,9 @@ class _EditarDadosBancariosPageState extends State<EditarDadosBancariosPage> {
       context.showSuccess('Chave PIX salva no cadastro.');
       context.pop();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         context.showError(e.toString().replaceFirst('Bad state: ', ''));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -134,11 +135,12 @@ class _EditarDadosBancariosPageState extends State<EditarDadosBancariosPage> {
                           onSelected: _saving
                               ? null
                               : (selected) {
-                                  if (selected)
+                                  if (selected) {
                                     setState(() {
                                       _tipo = entry.key;
                                       _form.currentState?.validate();
                                     });
+                                  }
                                 },
                         ),
                     ],

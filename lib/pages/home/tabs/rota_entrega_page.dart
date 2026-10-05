@@ -89,9 +89,10 @@ Future<void> _corrigirDestino(
         double.parse(lng.text.replaceAll(',', '.')),
       );
     } catch (e) {
-      if (context.mounted)
+      if (context.mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
     }
   }
   lat.dispose();

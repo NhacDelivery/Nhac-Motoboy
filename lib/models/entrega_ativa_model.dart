@@ -45,8 +45,9 @@ class EnderecoEntregaModel {
     if (cidade != null && cidade!.isNotEmpty) partes.add(cidade!);
     if (estado != null && estado!.isNotEmpty) partes.add(estado!);
     if (cep != null && cep!.isNotEmpty) partes.add('CEP $cep');
-    if (complemento != null && complemento!.isNotEmpty)
+    if (complemento != null && complemento!.isNotEmpty) {
       partes.add('($complemento)');
+    }
     return partes.isNotEmpty ? partes.join(' - ') : 'Endereço não informado';
   }
 }

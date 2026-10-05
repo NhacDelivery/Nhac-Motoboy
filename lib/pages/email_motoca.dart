@@ -117,19 +117,22 @@ class _EmailMotocaPageState extends State<EmailMotocaPage> {
       await _googleInitialization;
       final account = await google.authenticate();
       final idToken = account.authentication.idToken;
-      if (idToken == null)
+      if (idToken == null) {
         throw StateError('O Google não retornou um token de identidade.');
+      }
       final token = await _authService.loginComGoogle(idToken);
       await ApiConfig.setAuthToken(token);
       if (mounted) context.go('/home-motoca');
     } on GoogleSignInException catch (e) {
-      if (e.code != GoogleSignInExceptionCode.canceled && mounted)
+      if (e.code != GoogleSignInExceptionCode.canceled && mounted) {
         context.showError(
           'Não foi possível entrar com Google. Tente novamente.',
         );
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         context.showError(e.toString().replaceFirst('Bad state: ', ''));
+      }
     } finally {
       if (mounted) setState(() => _isGoogleLoading = false);
     }

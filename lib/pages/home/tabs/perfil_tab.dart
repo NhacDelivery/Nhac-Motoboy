@@ -467,7 +467,6 @@ class _AccountRow extends StatelessWidget {
   final String title, subtitle;
   final VoidCallback? onTap;
   const _AccountRow({
-    super.key,
     required this.icon,
     required this.title,
     required this.subtitle,

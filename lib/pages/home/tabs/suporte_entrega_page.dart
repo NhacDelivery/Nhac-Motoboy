@@ -37,11 +37,12 @@ class _SuporteEntregaPageState extends State<SuporteEntregaPage> {
   Future<void> _load() async {
     try {
       final data = await _api.request('GET', _path) as List;
-      if (mounted)
+      if (mounted) {
         setState(() {
           _tickets = data.map((e) => Map<String, dynamic>.from(e)).toList();
           _error = null;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {

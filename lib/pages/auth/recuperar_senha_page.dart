@@ -72,17 +72,19 @@ class _RecuperarSenhaPageState extends State<RecuperarSenhaPage> {
           _code.text.trim(),
           _password.text,
         );
-        if (mounted)
+        if (mounted) {
           context.go(
             ApiConfig.temSessaoSalva ? '/home-motoca' : '/email-motoca',
           );
+        }
       } else {
         await _service.recuperarSenha(_email.text.trim());
-        if (mounted)
+        if (mounted) {
           setState(() {
             _sent = true;
             _iniciarIntervalo();
           });
+        }
       }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
