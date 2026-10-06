@@ -41,9 +41,15 @@ void main() {
         await until(() => finder.evaluate().isNotEmpty);
         FocusManager.instance.primaryFocus?.unfocus();
         await tester.pump(const Duration(milliseconds: 350));
-        await tester.ensureVisible(finder.first);
+        final buttons = find.descendant(
+          of: finder.first,
+          matching: find.byType(ElevatedButton),
+        );
+        final target = buttons.evaluate().length == 1 ? buttons : finder;
+        await tester.ensureVisible(target.first);
         await tester.pump(const Duration(milliseconds: 350));
-        await tester.tap(finder.first);
+        await until(() => target.hitTestable().evaluate().isNotEmpty);
+        await tester.tap(target.hitTestable().first);
         await tester.pump();
       }
 
@@ -131,6 +137,14 @@ void main() {
                 .controller!
                 .text
                 .isEmpty,
+      );
+      await tester.pageBack();
+      await tester.pump();
+      await tap(find.byKey(const Key('chat-button')));
+      await until(
+        () =>
+            find.text('Conectando ao chat…').evaluate().isEmpty &&
+            find.text('Mensagem enviada no dispositivo').evaluate().isNotEmpty,
       );
       await tester.pageBack();
       await tester.pump();
