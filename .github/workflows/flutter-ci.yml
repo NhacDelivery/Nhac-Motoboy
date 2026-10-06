@@ -52,7 +52,6 @@ jobs:
           retention-days: 7
   test:
     env:
-      NHAC_DEBUG_KEYSTORE: ${{ runner.temp }}/motoboy-debug.keystore
       GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID || '261563193700-snhkp8paeqme3ilopc22unio3b1g7a3o.apps.googleusercontent.com' }}
       FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
       FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
@@ -71,6 +70,8 @@ jobs:
           flutter-version: '3.47.6'
           cache: true
       - run: flutter config --jdk-dir="$JAVA_HOME_17_X64"
+      - name: Definir caminho da chave de teste
+        run: echo "NHAC_DEBUG_KEYSTORE=$RUNNER_TEMP/motoboy-debug.keystore" >> "$GITHUB_ENV"
       - name: Preservar certificado do APK de teste
         uses: actions/cache@v4
         with:
