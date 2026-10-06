@@ -9,6 +9,7 @@ import 'package:nhac_motoboy/main.dart' as app;
 import 'package:nhac_motoboy/services/api_config.dart';
 import 'package:nhac_motoboy/controllers/entrega_provider.dart';
 import 'package:nhac_motoboy/components/home/status_toggle_button.dart';
+import 'package:nhac_motoboy/pages/home/tabs/rota_entrega_page.dart';
 import 'package:provider/provider.dart';
 
 void main() {
@@ -58,6 +59,22 @@ void main() {
         await tester.ensureVisible(finder.first);
         await tester.enterText(finder.first, text);
         await tester.pump();
+      }
+
+      Future<void> tapRota(Finder finder) async {
+        await until(() => find.byType(RotaEntregaPage).evaluate().isNotEmpty);
+        await tester.scrollUntilVisible(
+          finder,
+          250,
+          scrollable: find
+              .descendant(
+                of: find.byType(RotaEntregaPage),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+          maxScrolls: 25,
+        );
+        await tap(finder);
       }
 
       final client = http.Client();
@@ -118,7 +135,7 @@ void main() {
       final oferta = delivery.ofertas.first;
       await tap(find.byKey(Key('oferta-aceitar-${oferta.id}')));
       await until(() => delivery.entregaAtiva != null);
-      await tap(find.byKey(const Key('chat-button')));
+      await tapRota(find.byKey(const Key('chat-button')));
       await until(() => find.text('Conectando ao chat…').evaluate().isEmpty);
       await enter(
         find.byKey(const Key('chat-message-input')),
@@ -140,7 +157,7 @@ void main() {
       );
       await tester.pageBack();
       await tester.pump();
-      await tap(find.byKey(const Key('chat-button')));
+      await tapRota(find.byKey(const Key('chat-button')));
       await until(
         () =>
             find.text('Conectando ao chat…').evaluate().isEmpty &&
@@ -148,10 +165,10 @@ void main() {
       );
       await tester.pageBack();
       await tester.pump();
-      await tap(find.byKey(const Key('corrida-coletar-button')));
+      await tapRota(find.byKey(const Key('corrida-coletar-button')));
       await tap(find.byKey(const Key('corrida-confirmar-dialog')));
       await until(() => delivery.entregaColetada);
-      await tap(find.byKey(const Key('corrida-entregar-button')));
+      await tapRota(find.byKey(const Key('corrida-entregar-button')));
       await enter(find.byKey(const Key('entrega-codigo')), '0123');
       await tap(find.byKey(const Key('entrega-confirmar')));
       await until(() => delivery.entregaAtiva == null);

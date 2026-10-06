@@ -62,7 +62,10 @@ if [[ "${RUN_DEVICE:-false}" == "true" ]]; then
   adb -s "$device" install -r build/app/outputs/flutter-apk/app-debug.apk
   adb -s "$device" shell pm grant com.example.nhac_motoboy android.permission.ACCESS_FINE_LOCATION
   adb -s "$device" shell pm grant com.example.nhac_motoboy android.permission.ACCESS_COARSE_LOCATION
-  "$flutter_bin" test integration_test/motoboy_device_test.dart -d "$device" --dart-define=API_BASE_URL=http://127.0.0.1:18080 2>&1 | tee "$logs_dir/device.log"
+  if ! "$flutter_bin" test integration_test/motoboy_device_test.dart -d "$device" --dart-define=API_BASE_URL=http://127.0.0.1:18080 2>&1 | tee "$logs_dir/device.log"; then
+    adb -s "$device" exec-out screencap -p > "$logs_dir/device-failure.png" || true
+    exit 1
+  fi
 else
 CI=true "$flutter_bin" --suppress-analytics --no-version-check test \
   test/integration/motoboy_backend_test.dart \
