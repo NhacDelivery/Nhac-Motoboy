@@ -39,8 +39,10 @@ void main() {
 
       Future<void> tap(Finder finder) async {
         await until(() => finder.evaluate().isNotEmpty);
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pump(const Duration(milliseconds: 350));
         await tester.ensureVisible(finder.first);
-        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 350));
         await tester.tap(finder.first);
         await tester.pump();
       }
@@ -85,8 +87,6 @@ void main() {
       await enter(find.byType(TextFormField).first, 'NhacIntegration#123');
       await tap(find.text('Continuar'));
       await tap(find.text('Comece seu cadastro'));
-      await tap(find.byType(DropdownButtonFormField<String>));
-      await tap(find.text('Motocicleta').last);
       await enter(find.byKey(const Key('cadastro-cpf')), '52998224725');
       await enter(find.byKey(const Key('cadastro-cnh')), '12345678900');
       await enter(find.byKey(const Key('cadastro-placa')), 'ABC1D23');
