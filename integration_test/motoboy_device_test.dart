@@ -24,7 +24,10 @@ void main() {
           uri.port != 18080) {
         throw StateError('Este teste exige backend isolado na porta 18080.');
       }
-      Future<void> until(bool Function() ready) async {
+      Future<void> until(
+        bool Function() ready, {
+        Future<void> Function()? advance,
+      }) async {
         final end = DateTime.now().add(const Duration(seconds: 45));
         while (!ready()) {
           if (DateTime.now().isAfter(end)) {
@@ -49,6 +52,7 @@ void main() {
             }
             fail('Etapa não concluída em 45s. Consulte DEVICE_TIMEOUT_UI.');
           }
+          if (advance != null) await advance();
           await tester.pump(const Duration(milliseconds: 250));
         }
       }
@@ -85,16 +89,22 @@ void main() {
         await until(() => find.byType(RotaEntregaPage).evaluate().isNotEmpty);
         FocusManager.instance.primaryFocus?.unfocus();
         await tester.pump(const Duration(milliseconds: 350));
-        await tester.scrollUntilVisible(
-          finder,
-          250,
-          scrollable: find
-              .descendant(
-                of: find.byType(RotaEntregaPage),
-                matching: find.byType(Scrollable),
-              )
-              .first,
-          maxScrolls: 25,
+        final viewport = find.descendant(
+          of: find.byType(RotaEntregaPage),
+          matching: find.byType(Scrollable),
+        );
+        await until(
+          () => finder.evaluate().isNotEmpty,
+          advance: () async {
+            if (viewport.evaluate().isEmpty) return;
+            final rect = tester.getRect(viewport.first);
+            // O centro da lista contém o mapa, que captura arrastos para pan.
+            // A margem lateral pertence à lista e permite rolar a página.
+            await tester.dragFrom(
+              Offset(rect.left + 8, rect.center.dy),
+              const Offset(0, -250),
+            );
+          },
         );
         await tap(finder, dismissKeyboard: false);
       }
@@ -157,6 +167,7 @@ void main() {
       final oferta = delivery.ofertas.first;
       await tap(find.byKey(Key('oferta-aceitar-${oferta.id}')));
       await until(() => delivery.entregaAtiva != null);
+      expect(delivery.entregaAtiva!.lojaId, isNotEmpty);
       await tapRota(find.byKey(const Key('chat-button')));
       await until(() => find.text('Conectando ao chat…').evaluate().isEmpty);
       await enter(

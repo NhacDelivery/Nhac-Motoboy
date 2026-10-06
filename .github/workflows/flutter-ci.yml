@@ -52,6 +52,7 @@ jobs:
           retention-days: 7
   test:
     env:
+      NHAC_DEBUG_KEYSTORE: ${{ runner.temp }}/motoboy-debug.keystore
       GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID || '261563193700-snhkp8paeqme3ilopc22unio3b1g7a3o.apps.googleusercontent.com' }}
       FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
       FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
@@ -73,8 +74,13 @@ jobs:
       - name: Preservar certificado do APK de teste
         uses: actions/cache@v4
         with:
-          path: ~/.android/debug.keystore
-          key: motoboy-android-debug-key-v1-${{ runner.os }}
+          path: ${{ runner.temp }}/motoboy-debug.keystore
+          key: motoboy-android-debug-key-v2-${{ runner.os }}
+      - name: Preparar chave estável do APK de teste
+        run: |
+          if [[ ! -f "$NHAC_DEBUG_KEYSTORE" ]]; then
+            keytool -genkeypair -noprompt -storetype JKS -keystore "$NHAC_DEBUG_KEYSTORE" -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
@@ -100,7 +106,14 @@ jobs:
           --dart-define=FIREBASE_MESSAGING_SENDER_ID="$FIREBASE_MESSAGING_SENDER_ID"
 
       - name: Certificado público do APK Android
-        run: keytool -list -v -alias androiddebugkey -keystore "$HOME/.android/debug.keystore" -storepass android > android-debug-certificate.txt
+        run: |
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          apk_signer=''
+          for candidate in "$sdk"/build-tools/*/apksigner; do
+            if [[ -x "$candidate" ]]; then apk_signer="$candidate"; fi
+          done
+          test -n "$apk_signer"
+          "$apk_signer" verify --print-certs build/app/outputs/flutter-apk/app-debug.apk > android-debug-certificate.txt
       - uses: actions/upload-artifact@v4
         with:
           name: nhac-motoboy-android-certificate
