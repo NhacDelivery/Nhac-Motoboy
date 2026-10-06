@@ -69,10 +69,11 @@ class _NotificacoesPageState extends State<NotificacoesPage> {
         context.showSuccess('Notificações ativadas neste aparelho.');
       }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         context.showError(
           'Não foi possível ativar os avisos. Tente novamente.',
         );
+      }
     } finally {
       if (mounted) setState(() => _registeringPush = false);
     }
