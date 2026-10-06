@@ -13,7 +13,7 @@ import 'package:nhac_motoboy/pages/home/tabs/rota_entrega_page.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets(
     'DEVICE-MOTO-001 login, cadastro, GPS nativo, oferta, chat, coleta e conclusão',
     (tester) async {
@@ -32,22 +32,41 @@ void main() {
                 .map((w) => w.data ?? w.textSpan?.toPlainText() ?? '')
                 .toList();
             debugPrint('DEVICE_TIMEOUT_UI: $textos');
+            try {
+              await binding.convertFlutterSurfaceToImage();
+              await tester.pump();
+              final png = await binding.takeScreenshot('device-timeout');
+              final encoded = base64Encode(png);
+              for (var offset = 0; offset < encoded.length; offset += 2000) {
+                final end = (offset + 2000).clamp(0, encoded.length).toInt();
+                debugPrintSynchronously(
+                  'DEVICE_SCREENSHOT_PART:${offset ~/ 2000}:${encoded.substring(offset, end)}',
+                );
+              }
+            } catch (_) {
+              debugPrint('DEVICE_SCREENSHOT_UNAVAILABLE');
+            }
             fail('Etapa não concluída em 45s. Consulte DEVICE_TIMEOUT_UI.');
           }
           await tester.pump(const Duration(milliseconds: 250));
         }
       }
 
-      Future<void> tap(Finder finder) async {
+      Future<void> tap(Finder finder, {bool dismissKeyboard = true}) async {
+        if (dismissKeyboard) {
+          FocusManager.instance.primaryFocus?.unfocus();
+          await tester.pump(const Duration(milliseconds: 350));
+        }
         await until(() => finder.evaluate().isNotEmpty);
-        FocusManager.instance.primaryFocus?.unfocus();
-        await tester.pump(const Duration(milliseconds: 350));
         final buttons = find.descendant(
-          of: finder.first,
+          of: finder,
           matching: find.byType(ElevatedButton),
         );
         final target = buttons.evaluate().length == 1 ? buttons : finder;
-        await tester.ensureVisible(target.first);
+        await Scrollable.ensureVisible(
+          tester.element(target.first),
+          alignment: 0.5,
+        );
         await tester.pump(const Duration(milliseconds: 350));
         await until(() => target.hitTestable().evaluate().isNotEmpty);
         await tester.tap(target.hitTestable().first);
@@ -63,6 +82,8 @@ void main() {
 
       Future<void> tapRota(Finder finder) async {
         await until(() => find.byType(RotaEntregaPage).evaluate().isNotEmpty);
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pump(const Duration(milliseconds: 350));
         await tester.scrollUntilVisible(
           finder,
           250,
@@ -74,7 +95,7 @@ void main() {
               .first,
           maxScrolls: 25,
         );
-        await tap(finder);
+        await tap(finder, dismissKeyboard: false);
       }
 
       final client = http.Client();

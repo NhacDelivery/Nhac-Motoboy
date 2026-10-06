@@ -64,6 +64,15 @@ if [[ "${RUN_DEVICE:-false}" == "true" ]]; then
   adb -s "$device" shell pm grant com.example.nhac_motoboy android.permission.ACCESS_COARSE_LOCATION
   if ! "$flutter_bin" test integration_test/motoboy_device_test.dart -d "$device" --dart-define=API_BASE_URL=http://127.0.0.1:18080 2>&1 | tee "$logs_dir/device.log"; then
     adb -s "$device" exec-out screencap -p > "$logs_dir/device-failure.png" || true
+    python3 - "$logs_dir" <<'PY'
+import base64, pathlib, re, sys
+directory = pathlib.Path(sys.argv[1])
+parts = re.findall(r'DEVICE_SCREENSHOT_PART:(\d+):([A-Za-z0-9+/=]+)', (directory / 'device.log').read_text())
+if parts:
+    ordered = dict(parts)
+    encoded = ''.join(ordered[str(i)] for i in range(len(ordered)))
+    (directory / 'device-failure.png').write_bytes(base64.b64decode(encoded))
+PY
     exit 1
   fi
 else
