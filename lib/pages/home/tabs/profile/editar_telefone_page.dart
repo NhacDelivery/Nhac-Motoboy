@@ -1,3 +1,4 @@
+import 'dart:async';
 import '../../../../services/auth_service.dart';
 import '../../../../utils/formatters.dart';
 
@@ -29,6 +30,35 @@ class _EditarTelefonePageState extends State<EditarTelefonePage> {
   bool _isLoading = false, _codigoEnviado = false;
   final _codigo = TextEditingController();
   final _auth = AuthService();
+  Timer? _timer;
+  int _intervalo = 0;
+  void _aguardarReenvio() {
+    _timer?.cancel();
+    setState(() => _intervalo = 60);
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || _intervalo <= 1) {
+        timer.cancel();
+        if (mounted) setState(() => _intervalo = 0);
+        return;
+      }
+      setState(() => _intervalo--);
+    });
+  }
+
+  Future<void> _reenviar() async {
+    if (_isLoading || _intervalo > 0) return;
+    setState(() => _isLoading = true);
+    try {
+      await _auth.enviarCodigoTelefone(telefoneE164(_phoneController.text));
+      if (!mounted) return;
+      _aguardarReenvio();
+      context.showSuccess('Código reenviado.');
+    } catch (e) {
+      if (mounted) context.showError(e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   void initState() {
@@ -48,6 +78,7 @@ class _EditarTelefonePageState extends State<EditarTelefonePage> {
 
   @override
   void dispose() {
+    _timer?.cancel();
     _phoneController.removeListener(_validarTelefone);
     _phoneController.dispose();
     _codigo.dispose();
@@ -74,7 +105,10 @@ class _EditarTelefonePageState extends State<EditarTelefonePage> {
       final telefone = telefoneE164(_phoneController.text);
       if (!_codigoEnviado) {
         await _auth.enviarCodigoTelefone(telefone);
-        if (mounted) setState(() => _codigoEnviado = true);
+        if (mounted) {
+          setState(() => _codigoEnviado = true);
+          _aguardarReenvio();
+        }
         return;
       }
       final user = context.read<UserProvider>();
@@ -159,6 +193,16 @@ class _EditarTelefonePageState extends State<EditarTelefonePage> {
                         ),
                       ),
                       if (_codigoEnviado) ...[
+                        TextButton(
+                          onPressed: _isLoading || _intervalo > 0
+                              ? null
+                              : _reenviar,
+                          child: Text(
+                            _intervalo > 0
+                                ? 'Reenviar código em ${_intervalo}s'
+                                : 'Reenviar código',
+                          ),
+                        ),
                         const SizedBox(height: 16),
                         TextField(
                           controller: _codigo,

@@ -88,8 +88,34 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
   EntregaAtivaModel? get entregaAtiva => _entrega;
   RotaModel? get rotaAtual => _rota;
   List<OfertaEntregaModel> get ofertas => List.unmodifiable(_ofertas);
-  OfertaEntregaModel? get ofertaAtual =>
-      _ofertas.isEmpty ? null : _ofertas.first;
+  String? ofertaSelecionadaId;
+  Future<void> selecionarOferta(String id) async {
+    final epoch = _epoch;
+    try {
+      final novas = await _service.buscarOfertasPendentes();
+      if (!_valid(epoch)) return;
+      _ofertas
+        ..clear()
+        ..addAll(novas.where((o) => !o.expirada));
+      ofertaSelecionadaId = _ofertas.any((o) => o.id == id) ? id : null;
+      if (ofertaSelecionadaId == null) {
+        aviso = 'Esta oferta não está mais disponível.';
+      }
+      _notify();
+    } catch (e) {
+      if (_valid(epoch)) {
+        erro = e.toString();
+        _notify();
+      }
+    }
+  }
+
+  OfertaEntregaModel? get ofertaAtual => _ofertas.isEmpty
+      ? null
+      : _ofertas.firstWhere(
+          (o) => o.id == ofertaSelecionadaId,
+          orElse: () => _ofertas.first,
+        );
   int get segundosRestantes => ofertaAtual?.segundosEm(DateTime.now()) ?? 0;
   bool get entregaColetada =>
       _entrega?.statusPedido == StatusPedido.saiuEntrega;
@@ -108,6 +134,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     _perfil = null;
     _entrega = null;
     _rota = null;
+    ofertaSelecionadaId = null;
     _ofertas.clear();
     _avisosRecentes.clear();
     _status = StatusOperacional.offline;
@@ -457,7 +484,8 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
         },
         onError: (Object error) {
           if (!_valid(epoch)) return;
-          erroLocalizacao = 'Não foi possível acompanhar o GPS. Abra o app e atualize sua localização.';
+          erroLocalizacao =
+              'Não foi possível acompanhar o GPS. Abra o app e atualize sua localização.';
           _notify();
         },
       );
@@ -529,7 +557,8 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     };
     void disconnected() {
       if (!_foreground || !_valid(connectionEpoch)) return;
-      avisoConexao = 'Atualizações em tempo real indisponíveis. As corridas continuam sendo consultadas automaticamente.';
+      avisoConexao =
+          'Atualizações em tempo real indisponíveis. As corridas continuam sendo consultadas automaticamente.';
       // Recalcula o intervalo de recuperação sem esperar o próximo polling.
       _start();
       _notify();
@@ -603,7 +632,8 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
       onError: (e) {
         if (e is ApiException && [400, 404, 409, 422].contains(e.status)) {
           _ofertas.removeWhere((o) => o.id == id);
-          aviso = 'Esta oferta não está mais disponível. Ela pode ter expirado ou sido aceita por outro entregador.';
+          aviso =
+              'Esta oferta não está mais disponível. Ela pode ter expirado ou sido aceita por outro entregador.';
         }
       },
     );

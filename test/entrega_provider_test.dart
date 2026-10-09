@@ -105,6 +105,31 @@ class FakeEntregaService extends EntregadorService {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test(
+    'toque na notificação consulta imediatamente e seleciona a oferta correta',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      await ApiConfig.setAuthToken('teste');
+      final service = FakeEntregaService();
+      final provider = EntregaProvider(service: service, automatic: false);
+      service.pending = [
+        offer(),
+        OfertaEntregaModel.fromJson({
+          ...offerJson(),
+          'id': 'o2',
+          'pedidoId': 'p2',
+        }),
+      ];
+      await provider.selecionarOferta('o2');
+      expect(provider.ofertaAtual?.id, 'o2');
+      service.pending = [];
+      await provider.selecionarOferta('o2');
+      expect(provider.ofertaAtual, isNull);
+      expect(provider.aviso, contains('não está mais disponível'));
+      provider.dispose();
+    },
+  );
+
   late FakeEntregaService service;
   late EntregaProvider provider;
   setUp(() async {
@@ -308,22 +333,25 @@ void main() {
       expect(provider.isCadastrado, true);
     },
   );
-  test('código inválido mantém corrida e detalhes sem repetir conclusão automaticamente', () async {
-    service.current = active('SAIU_ENTREGA');
-    service.operational = 'EM_ENTREGA';
-    await provider.sincronizar();
-    service.finishError = const ApiException(
-      400,
-      'Código inválido.',
-      code: 'CODIGO_ENTREGA_INVALIDO',
-      details: {'tentativasRestantes': 4},
-    );
-    expect(await provider.concluirEntregaAtual(codigo: '0123'), false);
-    expect(service.finishCalls, 1);
-    expect(provider.entregaAtiva, isNotNull);
-    expect(provider.erroConclusao?.details, {'tentativasRestantes': 4});
-    expect(provider.podeConcluir, true);
-  });
+  test(
+    'código inválido mantém corrida e detalhes sem repetir conclusão automaticamente',
+    () async {
+      service.current = active('SAIU_ENTREGA');
+      service.operational = 'EM_ENTREGA';
+      await provider.sincronizar();
+      service.finishError = const ApiException(
+        400,
+        'Código inválido.',
+        code: 'CODIGO_ENTREGA_INVALIDO',
+        details: {'tentativasRestantes': 4},
+      );
+      expect(await provider.concluirEntregaAtual(codigo: '0123'), false);
+      expect(service.finishCalls, 1);
+      expect(provider.entregaAtiva, isNotNull);
+      expect(provider.erroConclusao?.details, {'tentativasRestantes': 4});
+      expect(provider.podeConcluir, true);
+    },
+  );
   test('conclusão sem quatro dígitos não chama o servidor', () async {
     service.current = active('SAIU_ENTREGA');
     await provider.sincronizar();

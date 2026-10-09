@@ -32,7 +32,15 @@ class _HomeMotocaPageState extends State<HomeMotocaPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       PushService.shared.onOpen = (data) {
-        if (mounted) abrirAviso(context, data);
+        if (!mounted || !PushService.pertenceConta(data)) return;
+        if (data['tipo'] == 'OFERTA' && data['ofertaId'] != null) {
+          _onItemTapped(0);
+          context.read<EntregaProvider>().selecionarOferta(
+            data['ofertaId'].toString(),
+          );
+        } else {
+          abrirAviso(context, data);
+        }
       };
       PushService.shared.consumirInicial();
       context.read<UserProvider>().carregarDadosReais();

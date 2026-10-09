@@ -71,7 +71,7 @@
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Durante uma entrega ativa, sua localização permite acompanhar a corrida ao usar a navegação em segundo plano.</string>
 	<key>UIBackgroundModes</key>
-	<array><string>location</string></array>
+	<array><string>location</string><string>remote-notification</string></array>
 	<key>NSCameraUsageDescription</key>
 	<string>O Nhac usa a câmera para tirar sua foto de perfil.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

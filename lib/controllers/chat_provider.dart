@@ -36,7 +36,14 @@ class ChatProvider extends ChangeNotifier {
   Future<void> _storage = Future<void>.value();
   Future<void> _persistirPendente(String key, String value) {
     _storage = _storage.catchError((Object _) {}).then((_) async {
-      await (await SharedPreferences.getInstance()).setString(key, value);
+      if (!await (await SharedPreferences.getInstance()).setString(
+        key,
+        value,
+      )) {
+        throw StateError(
+          'Não foi possível salvar a mensagem no aparelho. Ela não foi enviada. Libere espaço e tente novamente.',
+        );
+      }
     });
     return _storage;
   }
@@ -299,7 +306,8 @@ class ChatProvider extends ChangeNotifier {
       _timeout?.cancel();
       _timeout = Timer(const Duration(seconds: 15), () {
         enviando = false;
-        erro = 'Mensagem sem confirmação. Consulte o histórico ou reenvie a mesma mensagem.';
+        erro =
+            'Mensagem sem confirmação. Consulte o histórico ou reenvie a mesma mensagem.';
         _notify();
       });
     } catch (e) {

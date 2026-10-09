@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../services/api_config.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
@@ -17,7 +20,10 @@ class _SuporteEntregaPageState extends State<SuporteEntregaPage> {
   final _form = GlobalKey<FormState>();
   String _motivo = 'OUTRO';
   String _id = const Uuid().v4();
-  bool _busy = false, _loading = true;
+  bool _busy = false, _loading = true, _falhaRestauracao = false;
+  late final String _key;
+  Map<String, dynamic>? _pendente;
+
   String? _error;
   List<Map<String, dynamic>> _tickets = [];
   String get _path =>
@@ -25,7 +31,9 @@ class _SuporteEntregaPageState extends State<SuporteEntregaPage> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _key =
+        'suporte:${ApiConfig.baseUrl}:${ApiConfig.usuarioId}:${widget.pedidoId}';
+    _restaurar();
   }
 
   @override
@@ -34,13 +42,41 @@ class _SuporteEntregaPageState extends State<SuporteEntregaPage> {
     super.dispose();
   }
 
+  Future<void> _restaurar() async {
+    try {
+      final raw = (await SharedPreferences.getInstance()).getString(_key);
+      if (!mounted) return;
+      if (raw != null) {
+        _pendente = Map<String, dynamic>.from(jsonDecode(raw));
+        _id = _pendente!['id'];
+        _motivo = _pendente!['motivo'];
+        _texto.text = _pendente!['descricao'];
+      }
+    } catch (_) {
+      if (mounted) {
+        _falhaRestauracao = true;
+        setState(
+          () => _error =
+              'Não foi possível recuperar a solicitação. Reabra esta tela.',
+        );
+      }
+    }
+    await _load();
+  }
+
   Future<void> _load() async {
     try {
       final data = await _api.request('GET', _path) as List;
+      if (_pendente != null && data.any((t) => t['id'] == _id)) {
+        await (await SharedPreferences.getInstance()).remove(_key);
+        _pendente = null;
+        _id = const Uuid().v4();
+        if (mounted) _texto.clear();
+      }
       if (mounted) {
         setState(() {
           _tickets = data.map((e) => Map<String, dynamic>.from(e)).toList();
-          _error = null;
+          if (!_falhaRestauracao) _error = null;
         });
       }
     } catch (e) {
@@ -51,22 +87,40 @@ class _SuporteEntregaPageState extends State<SuporteEntregaPage> {
   }
 
   Future<void> _send() async {
-    if (_busy || !_form.currentState!.validate()) return;
+    if (_busy || _falhaRestauracao || !_form.currentState!.validate()) return;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      await _api.request(
-        'POST',
-        _path,
-        body: {'id': _id, 'motivo': _motivo, 'descricao': _texto.text.trim()},
-      );
+      _pendente ??= {
+        'id': _id,
+        'motivo': _motivo,
+        'descricao': _texto.text.trim(),
+      };
+      if (!await (await SharedPreferences.getInstance()).setString(
+        _key,
+        jsonEncode(_pendente),
+      )) {
+        throw StateError(
+          'Não foi possível guardar a solicitação. Ela não foi enviada.',
+        );
+      }
+      await _api.request('POST', _path, body: _pendente);
+      await (await SharedPreferences.getInstance()).remove(_key);
+      _pendente = null;
       if (!mounted) return;
       _texto.clear();
       _id = const Uuid().v4();
       await _load();
     } catch (e) {
+      if (e is ApiException &&
+          e.status >= 400 &&
+          e.status < 500 &&
+          e.status != 408) {
+        await (await SharedPreferences.getInstance()).remove(_key);
+        _pendente = null;
+      }
       if (mounted) setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -115,13 +169,14 @@ class _SuporteEntregaPageState extends State<SuporteEntregaPage> {
                   child: Text('Outro atendimento'),
                 ),
               ],
-              onChanged: _busy
+              onChanged: _busy || _pendente != null
                   ? null
                   : (value) => setState(() => _motivo = value!),
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _texto,
+              readOnly: _busy || _pendente != null,
               maxLines: 4,
               maxLength: 2000,
               decoration: const InputDecoration(
@@ -132,8 +187,14 @@ class _SuporteEntregaPageState extends State<SuporteEntregaPage> {
                   : null,
             ),
             FilledButton(
-              onPressed: _busy ? null : _send,
-              child: Text(_busy ? 'Enviando…' : 'Abrir solicitação'),
+              onPressed: _busy || _loading || _falhaRestauracao ? null : _send,
+              child: Text(
+                _busy
+                    ? 'Enviando…'
+                    : _pendente != null
+                    ? 'Confirmar solicitação anterior'
+                    : 'Abrir solicitação',
+              ),
             ),
             if (_error != null)
               Text(_error!, style: const TextStyle(color: AppColors.erro)),

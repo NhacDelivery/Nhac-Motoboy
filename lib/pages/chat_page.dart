@@ -204,6 +204,7 @@ class _ChatPageState extends State<ChatPage> {
                     Expanded(
                       child: TextField(
                         key: const Key('chat-message-input'),
+                        enabled: p.textoPendente == null,
                         controller: _text,
                         maxLength: 4000,
                         maxLines: 3,

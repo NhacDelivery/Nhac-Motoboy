@@ -22,22 +22,37 @@ class PushService {
   bool ativo = false;
   bool registrado = false;
   Future<void> init() async {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    if (kIsWeb ||
+        ![
+          TargetPlatform.android,
+          TargetPlatform.iOS,
+        ].contains(defaultTargetPlatform)) {
+      return;
+    }
     const apiKey = String.fromEnvironment('FIREBASE_API_KEY');
-    const appId = String.fromEnvironment('FIREBASE_APP_ID');
+    final appId = defaultTargetPlatform == TargetPlatform.iOS
+        ? const String.fromEnvironment('FIREBASE_IOS_APP_ID')
+        : const String.fromEnvironment('FIREBASE_APP_ID');
     const sender = String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID');
     const project = String.fromEnvironment('FIREBASE_PROJECT_ID');
     if ([apiKey, appId, sender, project].any((v) => v.isEmpty)) {
-      erro = 'As notificações do aparelho ainda não foram configuradas nesta versão.';
+      erro =
+          'As notificações do aparelho ainda não foram configuradas nesta versão.';
       return;
     }
     try {
       await Firebase.initializeApp(
-        options: const FirebaseOptions(
+        options: FirebaseOptions(
           apiKey: apiKey,
           appId: appId,
           messagingSenderId: sender,
           projectId: project,
+          iosBundleId: defaultTargetPlatform == TargetPlatform.iOS
+              ? const String.fromEnvironment(
+                  'FIREBASE_IOS_BUNDLE_ID',
+                  defaultValue: 'com.example.nhacMotoboy',
+                )
+              : null,
         ),
       );
       FirebaseMessaging.onBackgroundMessage(receberPushSegundoPlano);
@@ -57,7 +72,14 @@ class PushService {
     }
   }
 
+  static bool pertenceConta(Map<String, dynamic> data) =>
+      ApiConfig.usuarioId != null &&
+      data['usuarioId']?.toString() == ApiConfig.usuarioId;
   void _open(Map<String, dynamic> data) {
+    if (!pertenceConta(data)) {
+      _initial = null;
+      return;
+    }
     if (!ApiConfig.temSessaoSalva) {
       _initial = data;
       return;
@@ -73,19 +95,23 @@ class PushService {
     if (_initial != null && ApiConfig.temSessaoSalva && onOpen != null) {
       final data = _initial!;
       _initial = null;
-      onOpen!(data);
+      if (pertenceConta(data)) onOpen!(data);
     }
   }
 
   Future<void> _register(String token) async {
     if (!ApiConfig.temSessaoSalva) return;
+    final conta = ApiConfig.usuarioId;
     try {
       await UserService().atualizar({'fcmToken': token});
+      if (conta != ApiConfig.usuarioId) return;
       registrado = true;
       erro = null;
     } catch (_) {
+      if (conta != ApiConfig.usuarioId) return;
       registrado = false;
-      erro = 'Não foi possível registrar as notificações. Abra as preferências para tentar novamente.';
+      erro =
+          'Não foi possível registrar as notificações. Abra as preferências para tentar novamente.';
     }
   }
 

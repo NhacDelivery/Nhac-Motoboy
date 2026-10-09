@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../controllers/entrega_provider.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../services/api_client.dart';
@@ -6,6 +8,7 @@ import '../../../services/push_service.dart';
 import '../../chat_page.dart';
 
 void abrirAviso(BuildContext context, Map<String, dynamic> aviso) {
+  if (!PushService.pertenceConta(aviso)) return;
   if (aviso['tipo'] == 'MENSAGEM' && aviso['lojaId'] != null) {
     Navigator.push(
       context,
@@ -17,7 +20,14 @@ void abrirAviso(BuildContext context, Map<String, dynamic> aviso) {
       ),
     );
   } else if (aviso['tipo'] == 'OFERTA') {
+    final entrega = context.read<EntregaProvider>();
+    final abrirInicio = PushService.shared.onOpen;
     context.go('/home-motoca');
+    if (abrirInicio != null) {
+      abrirInicio(aviso);
+    } else if (aviso['ofertaId'] != null) {
+      entrega.selecionarOferta(aviso['ofertaId'].toString());
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
@@ -55,11 +65,13 @@ class _AvisosPageState extends State<AvisosPage> {
       _error = null;
     });
     try {
-      final data = await _api.request(
-        'GET',
-        '/api/v1/entregador/avisos',
-        query: {'page': '${reset ? 0 : _page}'},
-      ) as Map;
+      final data =
+          await _api.request(
+                'GET',
+                '/api/v1/entregador/avisos',
+                query: {'page': '${reset ? 0 : _page}'},
+              )
+              as Map;
       if (!mounted) return;
       setState(() {
         if (reset) _items.clear();

@@ -1,6 +1,7 @@
 import '../../../utils/formatters.dart';
 
 import 'package:flutter/material.dart';
+import 'suporte_entrega_page.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -323,6 +324,17 @@ class _PedidosTabState extends State<PedidosTab> {
             Text('Status: ${item.status.label}'),
             Text(
               'Endereço da entrega: ${item.enderecoEntrega?.formatado ?? _regiao(item)}',
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.of(this.context).push(
+                  MaterialPageRoute(
+                    builder: (_) => SuporteEntregaPage(pedidoId: item.pedidoId),
+                  ),
+                );
+              },
+              child: const Text('Acompanhar suporte da corrida'),
             ),
             Text('Criado em: ${_formatarData(item.criadoEm)}'),
             if (item.coletadoEm != null)

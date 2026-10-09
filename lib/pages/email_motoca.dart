@@ -269,9 +269,11 @@ class _EmailMotocaPageState extends State<EmailMotocaPage> {
                           size: 22.r,
                           color: AppColors.texto,
                         ),
-                        onPressed: () {
-                          context.push('/insira-telefone');
-                        },
+                        onPressed: _isLoading || _isGoogleLoading
+                            ? null
+                            : () {
+                                context.push('/insira-telefone');
+                              },
                       ),
                     ],
                   ),
