@@ -37,11 +37,11 @@ A integração nativa de iOS requer também o registro do aplicativo e o esquema
 
 - O prazo de uma oferta é definido por `expiraEm` no backend (90 segundos no despacho atual).
 - O status offline ao ir para segundo plano é tentado novamente enquanto o processo está vivo. Caso o sistema operacional encerre o app ou a rede continue indisponível, a confirmação não é garantida. O backend filtra posições antigas no despacho.
-- O indicador de frete é a taxa bruta calculada. O extrato de repasses consulta valores devidos, pagos e status em `/api/v1/entregador/repasses/extrato`; valores não apurados não são tratados como zero.
+- O indicador de frete é a taxa bruta calculada. O extrato de repasses consulta valores devidos, pagos e status em `/api/v1/entregador/repasses`; valores não apurados não são tratados como zero.
 - As preferências são salvas na conta. Push usa Firebase quando as credenciais da plataforma estão configuradas; notificações são verificadas por destinatário antes de abrir oferta, chat ou aviso.
 - O chat com a loja usa `clientMessageId` para confirmar e repetir mensagens sem duplicar, conforme a main atual. Uma falha ao abrir outra loja limpa a conversa ativa e a tentativa seguinte reabre a loja solicitada.
 - A foto é enviada ao endpoint autenticado `/api/v1/uploads/imagem` e vinculada a `imagemUrl` do usuário. A configuração de storage do backend deve estar ativa.
-- Suporte abre e acompanha protocolos em `/api/v1/entregador/suporte-entregas`. Retirada e transferência são decididas pelo backend; o app recupera o estado por `/api/v1/entregador/estado`.
+- Suporte abre e acompanha protocolos em `/api/v1/entregas/{pedidoId}/suporte`. Retirada e transferência são decididas pelo backend; o app recupera o estado por `/api/v1/entregador/estado`.
 
 ## Verificação
 
