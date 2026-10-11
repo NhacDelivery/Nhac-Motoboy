@@ -88,6 +88,7 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> abrir(String loja) async {
     final generation = ++_generation;
+    conversaId = null;
     _timeout?.cancel();
     _pendingId = null;
     _pendingText = null;
@@ -306,8 +307,7 @@ class ChatProvider extends ChangeNotifier {
       _timeout?.cancel();
       _timeout = Timer(const Duration(seconds: 15), () {
         enviando = false;
-        erro =
-            'Mensagem sem confirmação. Consulte o histórico ou reenvie a mesma mensagem.';
+        erro = 'Mensagem sem confirmação. Consulte o histórico ou reenvie a mesma mensagem.';
         _notify();
       });
     } catch (e) {

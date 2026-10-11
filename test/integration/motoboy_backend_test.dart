@@ -84,9 +84,8 @@ void main() {
       if (tokens[name] != null) 'Authorization': 'Bearer ${tokens[name]}',
     });
     if (body != null) request.body = jsonEncode(body);
-    final response = await http.Response.fromStream(
-      await client.send(request),
-    ).timeout(const Duration(seconds: 15));
+    final response = await http.Response.fromStream(await client.send(request))
+        .timeout(const Duration(seconds: 15));
     expect(
       response.statusCode,
       inInclusiveRange(200, 299),
@@ -132,7 +131,11 @@ void main() {
     return p;
   }
 
-  Future<void> accept(EntregaProvider p, String order) async {
+  Future<void> accept(
+    EntregaProvider p,
+    String order, {
+    bool remoteCollect = false,
+  }) async {
     await actor('lojista', 'POST', '/api/v1/entregas/despachar/$order');
     await p.sincronizar();
     expect(p.ofertas.where((o) => o.pedidoId == order), hasLength(1));
@@ -152,7 +155,18 @@ void main() {
     expect(p.rotaAtual!.pedidoId, order);
     expect(p.rotaAtual!.waypoints, isNotEmpty);
     expect(p.entregaAtiva!.clienteTelefone, isNotEmpty);
-    expect(await p.confirmarColeta(), true);
+    final pickupRoute = p.rotaAtual;
+    if (remoteCollect) {
+      // A coleta foi confirmada no servidor, mas a resposta se perdeu no app.
+      await service.coletarPedido(order);
+      expect(p.entregaAtiva!.statusPedido, StatusPedido.preparando);
+      await p.sincronizar();
+      expect(identical(p.rotaAtual, pickupRoute), false);
+      expect(p.rotaAtual!.destino.latitude, closeTo(-23.551000, 0.000001));
+      expect(p.rotaAtual!.destino.longitude, closeTo(-46.634000, 0.000001));
+    } else {
+      expect(await p.confirmarColeta(), true);
+    }
     expect(p.entregaAtiva!.statusPedido, StatusPedido.saiuEntrega);
   }
 
@@ -228,7 +242,7 @@ void main() {
       late EntregaProvider p;
       final initialized = await tester.runAsync(() async {
         p = await driver('motoboy');
-        await accept(p, 'it-pedido');
+        await accept(p, 'it-pedido', remoteCollect: true);
         final freshProvider = EntregaProvider(
           service: service,
           automatic: false,
@@ -254,9 +268,10 @@ void main() {
         );
         expect(location['latitude'], closeTo(-23.551000, 0.000001));
         expect(
-          DateTime.parse(
-            location['atualizadaEm'],
-          ).difference(DateTime.now()).abs().inSeconds,
+          DateTime.parse(location['atualizadaEm'])
+              .difference(DateTime.now())
+              .abs()
+              .inSeconds,
           lessThan(30),
         );
         final order = await actor(
@@ -381,8 +396,7 @@ void main() {
           expect(
             (p.erroConclusao!.details as Map)['tentativasRestantes'],
             5 - attempt,
-            reason:
-                'O contador deve sobreviver ao rollback da requisição inválida.',
+            reason: 'O contador deve sobreviver ao rollback da requisição inválida.',
           );
         }
         return true;

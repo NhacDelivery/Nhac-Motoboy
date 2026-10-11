@@ -53,7 +53,9 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
       _gpsBusy = false,
       _disposed = false,
       _foreground = true;
-  bool _changingStatus = false, _pendingOffline = false, _routeLoading = false;
+  bool _changingStatus = false, _pendingOffline = false;
+  String? _routeLoadingFor;
+  int _routeRequestVersion = 0;
   Future<bool>? _offlineOperation;
   String? _routeRequestedFor;
   bool erroRotaDados = false;
@@ -145,7 +147,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     inicializado = false;
     _pendingOffline = false;
     _routeRequestedFor = null;
-    _routeLoading = false;
+    _routeLoadingFor = null;
     latitudeAtual = null;
     longitudeAtual = null;
     ultimaLocalizacaoEm = null;
@@ -206,7 +208,14 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
           return;
         }
         final previous = _entrega?.pedidoId;
+        final previousRoute = _routeKey;
         _entrega = active;
+        if (previousRoute != _routeKey) {
+          _rota = null;
+          _routeRequestedFor = null;
+          erroRota = null;
+          erroRotaDados = false;
+        }
         if (active == null) {
           _rota = null;
           _routeRequestedFor = null;
@@ -484,8 +493,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
         },
         onError: (Object error) {
           if (!_valid(epoch)) return;
-          erroLocalizacao =
-              'Não foi possível acompanhar o GPS. Abra o app e atualize sua localização.';
+          erroLocalizacao = 'Não foi possível acompanhar o GPS. Abra o app e atualize sua localização.';
           _notify();
         },
       );
@@ -557,8 +565,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     };
     void disconnected() {
       if (!_foreground || !_valid(connectionEpoch)) return;
-      avisoConexao =
-          'Atualizações em tempo real indisponíveis. As corridas continuam sendo consultadas automaticamente.';
+      avisoConexao = 'Atualizações em tempo real indisponíveis. As corridas continuam sendo consultadas automaticamente.';
       // Recalcula o intervalo de recuperação sem esperar o próximo polling.
       _start();
       _notify();
@@ -632,8 +639,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
       onError: (e) {
         if (e is ApiException && [400, 404, 409, 422].contains(e.status)) {
           _ofertas.removeWhere((o) => o.id == id);
-          aviso =
-              'Esta oferta não está mais disponível. Ela pode ter expirado ou sido aceita por outro entregador.';
+          aviso = 'Esta oferta não está mais disponível. Ela pode ter expirado ou sido aceita por outro entregador.';
         }
       },
     );
@@ -653,26 +659,47 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> carregarEntregaAtiva() => sincronizar();
+  // O backend troca o destino da loja para o cliente após a coleta e
+  // recalcula a rota quando as coordenadas do pedido são corrigidas.
+  String? get _routeKey => _entrega == null
+      ? null
+      : jsonEncode([
+          _entrega!.pedidoId,
+          _entrega!.statusPedido.api,
+          _entrega!.lojaLatitude,
+          _entrega!.lojaLongitude,
+          _entrega!.entregaLatitude,
+          _entrega!.entregaLongitude,
+        ]);
+
   Future<void> carregarRota(String id, {bool tentarNovamente = false}) async {
-    if (_routeLoading || (!tentarNovamente && _routeRequestedFor == id)) return;
-    _routeLoading = true;
-    _routeRequestedFor = id;
+    final key = _routeKey;
+    if (key == null ||
+        _entrega?.pedidoId != id ||
+        _routeLoadingFor == key ||
+        (!tentarNovamente && _routeRequestedFor == key))
+      return;
+    _routeLoadingFor = key;
+    _routeRequestedFor = key;
+    final version = ++_routeRequestVersion;
     final epoch = _epoch;
+    bool current() =>
+        _valid(epoch) && version == _routeRequestVersion && _routeKey == key;
     try {
       final route = await _service.obterRota(id);
-      if (_valid(epoch) && _entrega?.pedidoId == id) {
+      if (current()) {
         _rota = route;
         erroRota = null;
         erroRotaDados = false;
       }
     } catch (e) {
-      if (_valid(epoch)) {
+      if (current()) {
         erroRota = e.toString();
         erroRotaDados = e is ApiException && e.status == 422;
       }
     } finally {
-      if (_valid(epoch)) {
-        _routeLoading = false;
+      if (_valid(epoch) && version == _routeRequestVersion) {
+        _routeLoadingFor = null;
         _notify();
       }
     }

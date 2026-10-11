@@ -13,11 +13,18 @@ import 'package:nhac_motoboy/services/realtime_service.dart';
 
 class _ChatService extends ChatService {
   int historyCalls = 0;
+  Object? openError;
+  final List<String> opened = [];
   String conversation = 'conv_1';
   Completer<void>? historyGate;
   int? gatedCall;
   @override
-  Future<String> abrir(String lojaId) async => conversation;
+  Future<String> abrir(String lojaId) async {
+    opened.add(lojaId);
+    if (openError != null) throw openError!;
+    return conversation;
+  }
+
   @override
   Future<({List<MensagemModel> mensagens, bool last})> historico(
     String id,
@@ -102,6 +109,24 @@ void main() {
       await ApiConfig.limparSessao();
     },
   );
+  test('falha ao trocar de loja não reutiliza a conversa anterior', () async {
+    SharedPreferences.setMockInitialValues({});
+    final service = _ChatService();
+    final socket = _Realtime();
+    final provider = ChatProvider(service: service, realtime: socket);
+    addTearDown(provider.dispose);
+    await provider.abrir('primeira');
+    service.openError = StateError('Sem conexão');
+    await provider.abrir('segunda');
+    expect(provider.conversaId, isNull);
+    expect(provider.enviar('Mensagem para a segunda'), false);
+    service.openError = null;
+    service.conversation = 'conv_2';
+    await provider.tentarNovamente('segunda');
+    expect(provider.conversaId, 'conv_2');
+    expect(service.opened, ['primeira', 'segunda', 'segunda']);
+    expect(socket.reconnects, 0);
+  });
   test('pendente fica vinculado à conversa ao trocar de loja', () async {
     SharedPreferences.setMockInitialValues({});
     final service = _ChatService();

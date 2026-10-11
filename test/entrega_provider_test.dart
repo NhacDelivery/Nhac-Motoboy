@@ -209,6 +209,46 @@ void main() {
     expect(await provider.concluirEntregaAtual(codigo: '0123'), false);
     expect(service.finishCalls, 0);
   });
+  test(
+    'sincronização troca a rota após coleta confirmada no backend',
+    () async {
+      service.current = active();
+      await provider.sincronizar();
+      expect(service.routeCalls, 1);
+      service.current = active('SAIU_ENTREGA');
+      await provider.sincronizar();
+      expect(provider.entregaColetada, true);
+      expect(service.routeCalls, 2);
+    },
+  );
+  test('correção remota das coordenadas renova a rota', () async {
+    service.current = active('SAIU_ENTREGA');
+    await provider.sincronizar();
+    service.current = EntregaAtivaModel.fromJson({
+      ...activeJson('SAIU_ENTREGA'),
+      'entregaLatitude': -23.6,
+      'entregaLongitude': -46.7,
+    });
+    await provider.sincronizar();
+    expect(service.routeCalls, 2);
+  });
+  test('rota atrasada da loja não sobrescreve a rota após coleta', () async {
+    service.current = active();
+    service.routeGate = Completer();
+    service.routeStarted = Completer();
+    final sync = provider.sincronizar();
+    await service.routeStarted!.future;
+    final oldGate = service.routeGate!;
+    service.routeGate = null;
+    expect(await provider.confirmarColeta(), true);
+    final latest = provider.rotaAtual;
+    expect(latest, isNotNull);
+    expect(service.routeCalls, 2);
+    oldGate.complete(route());
+    await sync;
+    expect(identical(provider.rotaAtual, latest), true);
+    expect(provider.entregaColetada, true);
+  });
   test('conclusão limpa corrida e rota e retorna online', () async {
     service.current = active('SAIU_ENTREGA');
     service.operational = 'EM_ENTREGA';
@@ -333,25 +373,22 @@ void main() {
       expect(provider.isCadastrado, true);
     },
   );
-  test(
-    'código inválido mantém corrida e detalhes sem repetir conclusão automaticamente',
-    () async {
-      service.current = active('SAIU_ENTREGA');
-      service.operational = 'EM_ENTREGA';
-      await provider.sincronizar();
-      service.finishError = const ApiException(
-        400,
-        'Código inválido.',
-        code: 'CODIGO_ENTREGA_INVALIDO',
-        details: {'tentativasRestantes': 4},
-      );
-      expect(await provider.concluirEntregaAtual(codigo: '0123'), false);
-      expect(service.finishCalls, 1);
-      expect(provider.entregaAtiva, isNotNull);
-      expect(provider.erroConclusao?.details, {'tentativasRestantes': 4});
-      expect(provider.podeConcluir, true);
-    },
-  );
+  test('código inválido mantém corrida e detalhes sem repetir conclusão automaticamente', () async {
+    service.current = active('SAIU_ENTREGA');
+    service.operational = 'EM_ENTREGA';
+    await provider.sincronizar();
+    service.finishError = const ApiException(
+      400,
+      'Código inválido.',
+      code: 'CODIGO_ENTREGA_INVALIDO',
+      details: {'tentativasRestantes': 4},
+    );
+    expect(await provider.concluirEntregaAtual(codigo: '0123'), false);
+    expect(service.finishCalls, 1);
+    expect(provider.entregaAtiva, isNotNull);
+    expect(provider.erroConclusao?.details, {'tentativasRestantes': 4});
+    expect(provider.podeConcluir, true);
+  });
   test('conclusão sem quatro dígitos não chama o servidor', () async {
     service.current = active('SAIU_ENTREGA');
     await provider.sincronizar();
