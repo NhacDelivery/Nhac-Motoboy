@@ -67,10 +67,12 @@ de produção. O CI usa a main do backend; o SHA exato de cada execução é reg
 | IT-MOTO-002 | Contador persistido entre requisições, bloqueio após cinco códigos errados, tela desabilitada, código correto recusado durante o bloqueio e entrega mantida em andamento. |
 | IT-MOTO-003 | Conta sem vínculo de entregador não consulta ofertas nem a rota de outra pessoa. |
 
+A suíte também executa IT-MOTO-004 a IT-MOTO-030: autenticação por e-mail/SMS, senha, perfil, bicicleta/moto, Pix, ofertas concorrentes, suporte, retirada/transferência, repasses, avisos, chat STOMP, sessão, segundo plano e recuperação após falha de rede. Consulte a [matriz completa e os limites da cobertura](docs/integracao-motoboy.md).
+
 HTTP, JWT, providers, telas, serviços Spring e persistência são reais. Apenas a
 leitura do GPS e SharedPreferences usam adaptadores controlados no host. O
 provedor externo de rota usa o modo de teste existente do backend. Aquisição do
-GPS no Android, telefonia, tiles do mapa, WebSocket e retomada do processo nativo
+GPS no Android, telefonia, tiles do mapa e retomada do processo nativo
 precisam de testes em emulador/aparelho; esta suíte não afirma cobri-los.
 
 Os pedidos PREPARANDO são fixtures: criação, pagamento e preparação pelo lojista

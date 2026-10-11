@@ -145,6 +145,7 @@ class _SuporteEntregaPageState extends State<SuporteEntregaPage> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: _motivo,
               decoration: const InputDecoration(labelText: 'Motivo'),
               items: const [

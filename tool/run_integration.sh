@@ -30,8 +30,8 @@ git -C "$backend_dir" status --porcelain > "$logs_dir/backend-working-tree.txt"
 (cd "$backend_dir" && ./mvnw -B -q -DskipTests test-compile dependency:build-classpath \
   "-Dmdep.outputFile=$run_dir/classpath") > "$logs_dir/backend-build.log" 2>&1
 classpath="$backend_dir/target/classes:$(cat "$run_dir/classpath")"
-javac -cp "$classpath" -d "$run_dir/classes" \
-  "$app_dir/tool/integration/backend/MotoboyIntegrationFixture.java"
+javac -parameters -cp "$classpath" -d "$run_dir/classes" \
+  "$app_dir/tool/integration/backend/"*.java
 java -Dspring.devtools.restart.enabled=false -cp "$run_dir/classes:$classpath" br.com.nhac.backend_nhac.BackendNhacApplication \
   --spring.profiles.active=motoboy-integration \
   "--spring.config.additional-location=file:$app_dir/tool/integration/backend/" \
@@ -76,8 +76,8 @@ PY
     exit 1
   fi
 else
-CI=true "$flutter_bin" --suppress-analytics --no-version-check test \
-  test/integration/motoboy_backend_test.dart \
+CI=true "$flutter_bin" --suppress-analytics --no-version-check test --no-pub \
+  test/integration/ --concurrency=1 \
   --dart-define=RUN_INTEGRATION=true \
   --dart-define=API_BASE_URL=http://127.0.0.1:18080 \
   --reporter=expanded 2>&1 | tee "$logs_dir/flutter.log"

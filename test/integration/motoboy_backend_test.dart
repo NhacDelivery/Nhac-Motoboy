@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
@@ -16,36 +15,8 @@ import 'package:nhac_motoboy/pages/home/tabs/confirmar_entrega_page.dart';
 import 'package:nhac_motoboy/services/api_client.dart';
 import 'package:nhac_motoboy/services/api_config.dart';
 import 'package:nhac_motoboy/services/entregador_service.dart';
-import 'package:nhac_motoboy/services/location_service.dart';
 
-// Flutter normalmente devolve HTTP 400 em testWidgets. Este binding permite
-// tráfego real exclusivamente nesta suíte opt-in, com destino loopback.
-class BackendIntegrationBinding extends AutomatedTestWidgetsFlutterBinding {
-  @override
-  bool get overrideHttpClient => false;
-}
-
-// A fronteira com o hardware é controlada; provider, HTTP, JWT, regras,
-// transações, repositórios e telas são os componentes reais.
-class IntegrationLocation extends LocationService {
-  double latitude = -23.550520, longitude = -46.633308;
-  @override
-  Future<String?> solicitarPermissao({bool request = true}) async => null;
-  @override
-  Future<Position?> obterPosicaoAtual({bool emEntrega = false}) async =>
-      Position(
-        latitude: latitude,
-        longitude: longitude,
-        timestamp: DateTime.now(),
-        accuracy: 5,
-        altitude: 0,
-        altitudeAccuracy: 0,
-        heading: 0,
-        headingAccuracy: 0,
-        speed: 0,
-        speedAccuracy: 0,
-      );
-}
+import 'integration_support.dart';
 
 const enabled = bool.fromEnvironment('RUN_INTEGRATION');
 
@@ -84,8 +55,9 @@ void main() {
       if (tokens[name] != null) 'Authorization': 'Bearer ${tokens[name]}',
     });
     if (body != null) request.body = jsonEncode(body);
-    final response = await http.Response.fromStream(await client.send(request))
-        .timeout(const Duration(seconds: 15));
+    final response = await http.Response.fromStream(
+      await client.send(request),
+    ).timeout(const Duration(seconds: 15));
     expect(
       response.statusCode,
       inInclusiveRange(200, 299),
@@ -268,10 +240,9 @@ void main() {
         );
         expect(location['latitude'], closeTo(-23.551000, 0.000001));
         expect(
-          DateTime.parse(location['atualizadaEm'])
-              .difference(DateTime.now())
-              .abs()
-              .inSeconds,
+          DateTime.parse(
+            location['atualizadaEm'],
+          ).difference(DateTime.now()).abs().inSeconds,
           lessThan(30),
         );
         final order = await actor(
@@ -396,7 +367,8 @@ void main() {
           expect(
             (p.erroConclusao!.details as Map)['tentativasRestantes'],
             5 - attempt,
-            reason: 'O contador deve sobreviver ao rollback da requisição inválida.',
+            reason:
+                'O contador deve sobreviver ao rollback da requisição inválida.',
           );
         }
         return true;
