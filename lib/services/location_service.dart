@@ -58,21 +58,31 @@ class LocationService {
   /// move pelo menos 25 metros, o que já é mais que suficiente para o raio de
   /// despacho de quilômetros e para o polling de rota do mapa.
   bool get suportaSegundoPlano =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
 
   /// Iniciado enquanto a corrida está visível; o Android mantém uma notificação.
   /// O processo encerrado pelo sistema não é reiniciado automaticamente.
   Stream<Position> streamDePosicao() {
     return Geolocator.getPositionStream(
-      locationSettings: suportaSegundoPlano
+      locationSettings: !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS
+          ? AppleSettings(
+              accuracy: LocationAccuracy.high,
+              activityType: ActivityType.automotiveNavigation,
+              distanceFilter: 0,
+              pauseLocationUpdatesAutomatically: false,
+              showBackgroundLocationIndicator: true,
+              allowBackgroundLocationUpdates: true,
+            )
+          : suportaSegundoPlano
           ? AndroidSettings(
               accuracy: LocationAccuracy.high,
               distanceFilter: 0,
               intervalDuration: const Duration(seconds: 30),
               foregroundNotificationConfig: const ForegroundNotificationConfig(
                 notificationTitle: 'Entrega em andamento',
-                notificationText:
-                    'Sua localização acompanha a entrega, inclusive durante a navegação.',
+                notificationText: 'Sua localização acompanha a entrega, inclusive durante a navegação.',
                 notificationChannelName: 'Rastreamento de entregas',
                 notificationIcon: AndroidResource(name: 'ic_delivery_location'),
                 enableWakeLock: true,

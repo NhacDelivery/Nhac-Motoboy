@@ -1,4 +1,6 @@
+import 'repasses_page.dart';
 import '../../../utils/formatters.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -143,8 +145,16 @@ class _GanhosTabState extends State<GanhosTab> {
             Text('Frete das entregas', style: AppTextStyles.titulo()),
             SizedBox(height: 8.h),
             Text(
-              'Valores brutos de frete das entregas concluídas. Pagamentos e repasses não são acompanhados aqui.',
+              'Valores brutos de frete das entregas concluídas. Consulte valores apurados e pagamentos no extrato de repasses.',
               style: AppTextStyles.subtitulo(),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RepassesPage()),
+              ),
+              icon: const Icon(Icons.receipt_long_outlined),
+              label: const Text('Pagamentos e repasses'),
             ),
             SizedBox(height: 20.h),
             Wrap(
@@ -183,7 +193,20 @@ class _GanhosTabState extends State<GanhosTab> {
             else if (_naoEhEntregador)
               _buildNaoEhEntregador()
             else ...[
-              if (_carregando) const LinearProgressIndicator(),
+              if (_carregando)
+                const SizedBox(
+                  height: 40,
+                  child: Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: AppColors.primaria,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  ),
+                ),
               if (_erro != null) _buildErro(),
               if (_ganhos != null) _buildResumo(_ganhos!),
             ],
@@ -315,7 +338,11 @@ class _GanhosTabState extends State<GanhosTab> {
         ),
         SizedBox(height: 20.h),
         Text(
-          'Por dia',
+          switch (_periodoSelecionado) {
+            _Periodo.hoje => 'Hoje',
+            _Periodo.seteDias => 'Últimos 7 dias',
+            _Periodo.trintaDias => 'Últimos 30 dias',
+          },
           style: TextStyle(
             fontFamily: 'Roboto',
             fontSize: 15.sp,

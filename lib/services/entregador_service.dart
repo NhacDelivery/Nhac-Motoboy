@@ -1,6 +1,7 @@
 import '../models/estado_entregador_model.dart';
 import 'session_query_cache.dart';
 import 'api_config.dart';
+
 import 'package:http/http.dart' as http;
 
 import '../models/entregador_cadastro_model.dart';
@@ -20,6 +21,18 @@ class EntregadorService {
     : api = api ?? ApiClient(client: client);
   DateTime? _tentarEstadoDepois;
   static void invalidarConsultas() => SessionQueryCache.shared.clear();
+
+  Future<void> corrigirDestino(
+    String pedidoId,
+    double latitude,
+    double longitude,
+  ) async {
+    await api.request(
+      'PUT',
+      '/api/v1/entregas/${Uri.encodeComponent(pedidoId)}/coordenadas-destino',
+      body: {'latitude': latitude, 'longitude': longitude},
+    );
+  }
 
   Future<EstadoEntregadorModel> obterEstado() async {
     if (_tentarEstadoDepois == null ||
@@ -90,6 +103,7 @@ class EntregadorService {
     required String placaVeiculo,
     String? modeloVeiculo,
     String? corVeiculo,
+    String? cnh,
   }) async => EntregadorCadastroModel.fromJson(
     await api.request(
       'PATCH',
@@ -99,6 +113,7 @@ class EntregadorService {
         'placaVeiculo': placaVeiculo,
         'modeloVeiculo': modeloVeiculo,
         'corVeiculo': corVeiculo,
+        'cnh': ?cnh,
       },
     ),
   );

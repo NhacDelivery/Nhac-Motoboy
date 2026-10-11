@@ -197,6 +197,10 @@ class _AvaliacoesPageState extends State<AvaliacoesPage> {
                             ),
                           ),
                         ),
+                        Text(
+                          'Pedido #${item.pedidoId}',
+                          style: AppTextStyles.subtitulo(),
+                        ),
                         if (item.comentario?.trim().isNotEmpty == true) ...[
                           const SizedBox(height: 12),
                           Text(item.comentario!),

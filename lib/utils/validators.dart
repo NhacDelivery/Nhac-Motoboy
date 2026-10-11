@@ -1,3 +1,5 @@
+import 'formatters.dart';
+
 import 'package:email_validator/email_validator.dart';
 
 class Validators {
@@ -17,9 +19,6 @@ class Validators {
   static String? validarEmail(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'E-mail obrigatório';
-    }
-    if (!RegExp(r'^[a-zA-Z0-9@.]+$').hasMatch(value.trim())) {
-      return 'Caracteres inválidos (use apenas letras, números, @ e ponto)';
     }
     if (!EmailValidator.validate(value.trim())) {
       return 'E-mail inválido';
@@ -48,12 +47,21 @@ class Validators {
     if (value == null || value.trim().isEmpty) {
       return 'Telefone obrigatório';
     }
-    if (!RegExp(r'^[0-9\s()\-]+$').hasMatch(value)) {
+    if (!RegExp(r'^(?:\+55)?[0-9\s()\-]+$').hasMatch(value)) {
       return 'O telefone não pode conter letras ou caracteres especiais';
     }
-    final digitsOnly = value.replaceAll(RegExp(r'\D'), '');
+    final digitsOnly = telefoneNacional(value);
     if (digitsOnly.length < 10 || digitsOnly.length > 11) {
       return 'Tamanho inválido (deve ter 10 ou 11 números)';
+    }
+    return null;
+  }
+
+  static String? validarCelularPix(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Informe o celular';
+    if (validarTelefone(value) != null ||
+        !RegExp(r'^[1-9][0-9]9[0-9]{8}$').hasMatch(telefoneNacional(value))) {
+      return 'Informe DDD e celular com 9 dígitos';
     }
     return null;
   }
@@ -135,20 +143,20 @@ class Validators {
       return 'Placa obrigatória';
     }
     final placa = value.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
-    
+
     if (placa.length != 7) {
       return 'A placa deve ter 7 caracteres';
     }
-    
+
     // Validação padrão antigo: LLLNNNN (3 letras + 4 números)
     final padraoAntigo = RegExp(r'^[A-Z]{3}[0-9]{4}$');
     // Validação Mercosul: LLNLNLL (letras e números em posições específicas)
     final padraoMercosul = RegExp(r'^[A-Z]{3}[0-9][A-Z][0-9]{2}$');
-    
+
     if (!padraoAntigo.hasMatch(placa) && !padraoMercosul.hasMatch(placa)) {
       return 'Formato de placa inválido';
     }
-    
+
     return null;
   }
 }

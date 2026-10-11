@@ -37,11 +37,11 @@ A integração nativa de iOS requer também o registro do aplicativo e o esquema
 
 - O prazo de uma oferta é definido por `expiraEm` no backend (90 segundos no despacho atual).
 - O status offline ao ir para segundo plano é tentado novamente enquanto o processo está vivo. Caso o sistema operacional encerre o app ou a rede continue indisponível, a confirmação não é garantida. O backend filtra posições antigas no despacho.
-- O indicador de frete é a taxa bruta calculada para pedidos entregues; a API ainda não expõe repasses, valor devido ou pagamentos efetivados.
-- As preferências de notificações são salvas na conta, mas ainda não há push em segundo plano. O sino mostra ofertas e atualizações recebidas enquanto o aplicativo está aberto.
-- A confirmação e a repetição idempotente de mensagens dependem do suporte a `clientMessageId` no backend. Publique a alteração correspondente no backend antes de usar o novo chat.
+- O indicador de frete é a taxa bruta calculada. O extrato de repasses consulta valores devidos, pagos e status em `/api/v1/entregador/repasses`; valores não apurados não são tratados como zero.
+- As preferências são salvas na conta. Push usa Firebase quando as credenciais da plataforma estão configuradas; notificações são verificadas por destinatário antes de abrir oferta, chat ou aviso.
+- O chat com a loja usa `clientMessageId` para confirmar e repetir mensagens sem duplicar, conforme a main atual. Uma falha ao abrir outra loja limpa a conversa ativa e a tentativa seguinte reabre a loja solicitada.
 - A foto é enviada ao endpoint autenticado `/api/v1/uploads/imagem` e vinculada a `imagemUrl` do usuário. A configuração de storage do backend deve estar ativa.
-- Não há API de suporte ou retirada de corrida após o aceite. A tela orienta o motoboy a conversar com a loja; nenhuma corrida é liberada automaticamente.
+- Suporte abre e acompanha protocolos em `/api/v1/entregas/{pedidoId}/suporte`. Retirada e transferência são decididas pelo backend; o app recupera o estado por `/api/v1/entregador/estado`.
 
 ## Verificação
 
@@ -59,18 +59,20 @@ A identidade visual e as regras de estado das telas estão em [DESIGN.md](DESIGN
 Execute `BACKEND_DIR=../backend-nhac bash tool/run_integration.sh` com Java 25 e
 Flutter 3.47.6 no PATH. O runner sobe o Spring Boot em `127.0.0.1:18080`, cria um
 H2 descartável e encerra o processo ao terminar. Não exige Docker ou credenciais
-de produção. O CI fixa o commit do backend, registrado também nos logs.
+de produção. O CI usa a main do backend; o SHA exato de cada execução é registrado nos logs.
 
 | Cenário | Verificação |
 | --- | --- |
-| IT-MOTO-001 | Login JWT, cadastro de entregador, localização, ONLINE, despacho real, aceite mantendo PREPARANDO, rota, coleta para SAIU_ENTREGA, recuperação da entrega, localização visível ao cliente, erro na tela de código, código `0123`, ENTREGUE, histórico sem duplicata, avaliação real na tela e logout OFFLINE. |
+| IT-MOTO-001 | Login JWT, cadastro de entregador, localização, ONLINE, despacho real, aceite mantendo PREPARANDO, rota, coleta para SAIU_ENTREGA recuperada após perda da resposta, troca da rota para o cliente, recuperação da entrega, localização visível ao cliente, erro na tela de código, código `0123`, ENTREGUE, histórico sem duplicata, avaliação real na tela e logout OFFLINE. |
 | IT-MOTO-002 | Contador persistido entre requisições, bloqueio após cinco códigos errados, tela desabilitada, código correto recusado durante o bloqueio e entrega mantida em andamento. |
 | IT-MOTO-003 | Conta sem vínculo de entregador não consulta ofertas nem a rota de outra pessoa. |
+
+A suíte também executa IT-MOTO-004 a IT-MOTO-030: autenticação por e-mail/SMS, senha, perfil, bicicleta/moto, Pix, ofertas concorrentes, suporte, retirada/transferência, repasses, avisos, chat STOMP, sessão, segundo plano e recuperação após falha de rede. Consulte a [matriz completa e os limites da cobertura](docs/integracao-motoboy.md).
 
 HTTP, JWT, providers, telas, serviços Spring e persistência são reais. Apenas a
 leitura do GPS e SharedPreferences usam adaptadores controlados no host. O
 provedor externo de rota usa o modo de teste existente do backend. Aquisição do
-GPS no Android, telefonia, tiles do mapa, WebSocket e retomada do processo nativo
+GPS no Android, telefonia, tiles do mapa e retomada do processo nativo
 precisam de testes em emulador/aparelho; esta suíte não afirma cobri-los.
 
 Os pedidos PREPARANDO são fixtures: criação, pagamento e preparação pelo lojista
@@ -81,16 +83,16 @@ seja loopback. `flutter test` comum apenas a marca como ignorada.
 Logs: `integration-logs/backend-build.log`, `backend.log`, `flutter.log` e
 `backend-sha.txt`. No GitHub ficam no artefato `motoboy-integration-logs`.
 
-A integração detectou que a main `48f553f` desfazia as tentativas erradas no
-rollback. A correção está no [PR backend #131](https://github.com/NhacDelivery/backend-nhac/pull/131).
-O CI desta suíte fixa o commit `9ad5ce3f8f521a07b44fe322b3e6de42a7e95bae`, que contém
-essa correção. Para reproduzir localmente, use esse commit/branch no backend.
+A revisão de 11/10/2026 usou a main `62fe4325c8d3244898a60fff842e6f463c2885a9`.
+As correções de tentativas de código, estado consolidado, chat, suporte e repasses
+já fazem parte dela. Para reproduzir essa revisão, use esse SHA; no CI, consulte
+`backend-sha.txt` para identificar a versão testada.
 
 ### Otimizações de consultas e rastreamento
 
-O app usa `GET /api/v1/entregador/estado` sem cache para sincronizar perfil, corrida e ofertas em uma chamada. Servidores anteriores mantêm compatibilidade pelas consultas individuais. O CI fixa o backend `2d5dbed568efdd32cc894b91af4ef3db66bd9e02`.
+O app usa `GET /api/v1/entregador/estado` sem cache para sincronizar perfil, corrida e ofertas em uma chamada. Servidores anteriores mantêm compatibilidade pelas consultas individuais. As suítes de integração e dispositivo acompanham a main do backend.
 
-Frete e histórico têm cache de sessão de 45 s; avaliações, 1 min; perfil de exibição, 3 min. O cache é limitado, somente em memória, limpo na troca de conta/logout e invalidado após conclusão. Atualização manual ignora TTL. Corridas, ofertas e códigos não são usados como autoridade em cache.
+Frete e histórico têm cache de sessão de 45 s; avaliações, 1 min; perfil de exibição, 3 min. O cache é limitado, somente em memória, limpo na troca de conta/logout e invalidado após conclusão. Atualização manual ignora TTL. Corridas, ofertas e códigos não são usados como autoridade em cache. A rota é invalidada ao mudar o pedido, a etapa ou as coordenadas; respostas de uma etapa anterior não sobrescrevem a rota vigente.
 
 No Android, o GPS durante corrida usa o stream do geolocator com serviço de localização e notificação. Abrir Maps preserva esse stream; finalizar encerra rastreamento. Encerrar o processo não reinicia o serviço. Teste automatizado valida o ciclo de vida do provider; validação em aparelho com GPS, Maps e economia de bateria permanece necessária. iOS/web mantêm atualização em primeiro plano.
 

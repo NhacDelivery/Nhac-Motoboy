@@ -43,7 +43,11 @@ class EnderecoEntregaModel {
     }
     if (bairro != null && bairro!.isNotEmpty) partes.add(bairro!);
     if (cidade != null && cidade!.isNotEmpty) partes.add(cidade!);
-    if (complemento != null && complemento!.isNotEmpty) partes.add('($complemento)');
+    if (estado != null && estado!.isNotEmpty) partes.add(estado!);
+    if (cep != null && cep!.isNotEmpty) partes.add('CEP $cep');
+    if (complemento != null && complemento!.isNotEmpty) {
+      partes.add('($complemento)');
+    }
     return partes.isNotEmpty ? partes.join(' - ') : 'Endereço não informado';
   }
 }
@@ -91,15 +95,25 @@ class EntregaAtivaModel {
       lojaId: json['lojaId']?.toString(),
       lojaNome: json['lojaNome']?.toString() ?? 'Restaurante',
       lojaEndereco: json['lojaEndereco']?.toString() ?? '',
-      lojaLatitude: json['lojaLatitude'] != null ? (json['lojaLatitude'] as num).toDouble() : null,
-      lojaLongitude: json['lojaLongitude'] != null ? (json['lojaLongitude'] as num).toDouble() : null,
+      lojaLatitude: json['lojaLatitude'] != null
+          ? (json['lojaLatitude'] as num).toDouble()
+          : null,
+      lojaLongitude: json['lojaLongitude'] != null
+          ? (json['lojaLongitude'] as num).toDouble()
+          : null,
       clienteNome: json['clienteNome']?.toString() ?? 'Cliente',
       clienteTelefone: json['clienteTelefone']?.toString(),
       enderecoEntrega: json['enderecoEntrega'] != null
-          ? EnderecoEntregaModel.fromJson(json['enderecoEntrega'] as Map<String, dynamic>)
+          ? EnderecoEntregaModel.fromJson(
+              json['enderecoEntrega'] as Map<String, dynamic>,
+            )
           : null,
-      entregaLatitude: json['entregaLatitude'] != null ? (json['entregaLatitude'] as num).toDouble() : null,
-      entregaLongitude: json['entregaLongitude'] != null ? (json['entregaLongitude'] as num).toDouble() : null,
+      entregaLatitude: json['entregaLatitude'] != null
+          ? (json['entregaLatitude'] as num).toDouble()
+          : null,
+      entregaLongitude: json['entregaLongitude'] != null
+          ? (json['entregaLongitude'] as num).toDouble()
+          : null,
       valorTotal: (json['valorTotal'] as num?)?.toDouble() ?? 0.0,
       taxaFrete: (json['taxaFrete'] as num?)?.toDouble() ?? 0.0,
       formaPagamento: json['formaPagamento']?.toString() ?? 'PIX',

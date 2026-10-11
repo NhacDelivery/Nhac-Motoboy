@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
@@ -63,8 +64,11 @@ class _VerificacaoNumeroPageState extends State<VerificacaoNumeroPage> {
   }
 
   Future<void> _reenviarCodigo() async {
-    if (!_podeReenviar || _reenviando) return;
-    setState(() { _reenviando = true; _errorMessage = null; });
+    if (!_podeReenviar || _reenviando || _isLoading) return;
+    setState(() {
+      _reenviando = true;
+      _errorMessage = null;
+    });
     try {
       final telefone = context.read<CadastroController>().telefone;
       final telefoneFormatado =
@@ -95,7 +99,7 @@ class _VerificacaoNumeroPageState extends State<VerificacaoNumeroPage> {
   }
 
   Future<void> _confirmarCodigo() async {
-    if (!_codigoValido) return;
+    if (!_codigoValido || _isLoading || _reenviando) return;
 
     try {
       setState(() {
@@ -201,9 +205,13 @@ class _VerificacaoNumeroPageState extends State<VerificacaoNumeroPage> {
                       SizedBox(height: 20.h),
                       Center(
                         child: TextButton(
-                          onPressed: _podeReenviar && !_reenviando ? _reenviarCodigo : null,
+                          onPressed: _podeReenviar && !_reenviando
+                              ? _reenviarCodigo
+                              : null,
                           child: Text(
-                            _reenviando ? 'Enviando código…' : _podeReenviar
+                            _reenviando
+                                ? 'Enviando código…'
+                                : _podeReenviar
                                 ? 'Reenviar código por SMS'
                                 : 'Reenviar código em 00:${_tempoRestante.toString().padLeft(2, '0')}',
                             style: TextStyle(

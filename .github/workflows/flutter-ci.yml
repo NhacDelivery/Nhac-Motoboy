@@ -17,8 +17,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: NhacDelivery/backend-nhac
-          ref: 2d5dbed568efdd32cc894b91af4ef3db66bd9e02
+          ref: main
           path: backend-nhac
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -30,6 +34,8 @@ jobs:
           channel: stable
           flutter-version: '3.47.6'
           cache: true
+      - run: flutter config --jdk-dir="$JAVA_HOME_17_X64"
+        working-directory: app
       - run: flutter pub get
         working-directory: app
       - name: Fluxos com HTTP, JWT, banco e telas reais
@@ -45,7 +51,148 @@ jobs:
           if-no-files-found: error
           retention-days: 7
   test:
+    env:
+      GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID || '261563193700-snhkp8paeqme3ilopc22unio3b1g7a3o.apps.googleusercontent.com' }}
+      FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+      FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
+      FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+      FIREBASE_MESSAGING_SENDER_ID: ${{ vars.FIREBASE_MESSAGING_SENDER_ID }}
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.6'
+          cache: true
+      - run: flutter config --jdk-dir="$JAVA_HOME_17_X64"
+      - name: Definir caminho da chave de teste
+        run: echo "NHAC_DEBUG_KEYSTORE=$RUNNER_TEMP/motoboy-debug.keystore" >> "$GITHUB_ENV"
+      - name: Preservar certificado do APK de teste
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/motoboy-debug.keystore
+          key: motoboy-android-debug-key-v2-${{ runner.os }}
+      - name: Preparar chave estável do APK de teste
+        run: |
+          if [[ ! -f "$NHAC_DEBUG_KEYSTORE" ]]; then
+            keytool -genkeypair -noprompt -storetype JKS -keystore "$NHAC_DEBUG_KEYSTORE" -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - name: Dependências resolvidas e imagens de falhas dos testes
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: motoboy-test-results
+          path: |
+            pubspec.lock
+            test/failures/**
+          if-no-files-found: warn
+          retention-days: 7
+      - run: flutter build web --release --dart-define=API_BASE_URL=https://backend-nhac.onrender.com
+      - name: Conferir configuração de push no artefato
+        run: |
+          faltando=''
+          for nome in FIREBASE_API_KEY FIREBASE_APP_ID FIREBASE_PROJECT_ID FIREBASE_MESSAGING_SENDER_ID; do
+            if [[ -z "${!nome}" ]]; then faltando="$faltando $nome"; fi
+          done
+          if [[ -n "$faltando" ]]; then
+            echo "::warning::Push desativado neste APK; configure as variáveis:$faltando"
+            echo "Push desativado neste APK. Variáveis ausentes:$faltando" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Configuração Firebase incluída. Recebimento em aparelho ainda exige validação." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: APK com autenticação Google e configuração de push
+        run: >-
+          flutter build apk --debug
+          --dart-define=API_BASE_URL=https://backend-nhac.onrender.com
+          --dart-define=GOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID"
+          --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY"
+          --dart-define=FIREBASE_APP_ID="$FIREBASE_APP_ID"
+          --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID"
+          --dart-define=FIREBASE_MESSAGING_SENDER_ID="$FIREBASE_MESSAGING_SENDER_ID"
+
+      - name: Certificado público do APK Android
+        run: |
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          apk_signer=''
+          for candidate in "$sdk"/build-tools/*/apksigner; do
+            if [[ -x "$candidate" ]]; then apk_signer="$candidate"; fi
+          done
+          test -n "$apk_signer"
+          "$apk_signer" verify --print-certs build/app/outputs/flutter-apk/app-debug.apk > android-debug-certificate.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nhac-motoboy-android-certificate
+          path: android-debug-certificate.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nhac-motoboy-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  device:
+    name: Aplicativo completo em emulador Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: app
+      - uses: actions/checkout@v4
+        with:
+          repository: NhacDelivery/backend-nhac
+          ref: main
+          path: backend-nhac
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          cache-dependency-path: backend-nhac/pom.xml
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.6'
+          cache: true
+      - run: flutter config --jdk-dir="$JAVA_HOME_17_X64"
+        working-directory: app
+      - run: flutter pub get
+        working-directory: app
+      - name: Habilitar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          working-directory: app
+          script: RUN_DEVICE=true BACKEND_DIR="${{ github.workspace }}/backend-nhac" bash tool/run_integration.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: motoboy-device-logs
+          path: app/integration-logs/
+          if-no-files-found: warn
+
+  ios:
+    name: Compilação iOS sem assinatura
+    runs-on: macos-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -54,14 +201,20 @@ jobs:
           flutter-version: '3.47.6'
           cache: true
       - run: flutter pub get
-      - run: flutter analyze
-      - run: flutter test
-      - run: flutter build web --release --dart-define=API_BASE_URL=https://backend-nhac.onrender.com
-      - run: flutter build apk --debug --dart-define=API_BASE_URL=https://backend-nhac.onrender.com
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: nhac-motoboy-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
-          if-no-files-found: error
-          retention-days: 7
+      - name: Compilar iOS com configurações de autenticação e push
+        env:
+          GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID || '261563193700-snhkp8paeqme3ilopc22unio3b1g7a3o.apps.googleusercontent.com' }}
+          FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+          FIREBASE_IOS_APP_ID: ${{ vars.FIREBASE_IOS_APP_ID }}
+          FIREBASE_IOS_BUNDLE_ID: com.example.nhacMotoboy
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ vars.FIREBASE_MESSAGING_SENDER_ID }}
+        run: >-
+          flutter build ios --debug --no-codesign
+          --dart-define=API_BASE_URL=https://backend-nhac.onrender.com
+          --dart-define=GOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID"
+          --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY"
+          --dart-define=FIREBASE_IOS_APP_ID="$FIREBASE_IOS_APP_ID"
+          --dart-define=FIREBASE_IOS_BUNDLE_ID="$FIREBASE_IOS_BUNDLE_ID"
+          --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID"
+          --dart-define=FIREBASE_MESSAGING_SENDER_ID="$FIREBASE_MESSAGING_SENDER_ID"

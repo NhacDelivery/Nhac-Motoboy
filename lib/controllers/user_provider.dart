@@ -1,5 +1,7 @@
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
+
 import '../services/user_service.dart';
 import '../services/api_config.dart';
 
@@ -11,6 +13,7 @@ class UserProvider extends ChangeNotifier {
   String usuarioId = '', nome = '', email = '', telefone = '';
   String? fotoPerfil, erro;
   bool isLoading = false;
+  bool? temSenha;
   int _generation = 0;
   bool _disposed = false;
   int _requestVersion = 0;
@@ -55,6 +58,7 @@ class UserProvider extends ChangeNotifier {
       }
       usuarioId = id;
       nome = data['nome'] ?? '';
+      temSenha = data['temSenha'] as bool?;
       email = data['email'] ?? '';
       telefone = data['telefone'] ?? '';
       fotoPerfil = data['imagemUrl'];
@@ -136,6 +140,7 @@ class UserProvider extends ChangeNotifier {
     _loadingFuture = null;
     usuarioId = '';
     nome = '';
+    temSenha = null;
     email = '';
     telefone = '';
     fotoPerfil = null;

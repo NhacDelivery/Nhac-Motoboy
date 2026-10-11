@@ -30,6 +30,16 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs.getByName("debug") {
+        val preservedKey = System.getenv("NHAC_DEBUG_KEYSTORE")
+        if (!preservedKey.isNullOrBlank()) {
+            storeFile = file(preservedKey)
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
