@@ -677,8 +677,9 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     if (key == null ||
         _entrega?.pedidoId != id ||
         _routeLoadingFor == key ||
-        (!tentarNovamente && _routeRequestedFor == key))
+        (!tentarNovamente && _routeRequestedFor == key)) {
       return;
+    }
     _routeLoadingFor = key;
     _routeRequestedFor = key;
     final version = ++_routeRequestVersion;
