@@ -12,6 +12,7 @@ import 'package:nhac_motoboy/pages/home/tabs/ganhos_tab.dart';
 import 'package:nhac_motoboy/pages/home/tabs/pedidos_tab.dart';
 import 'package:nhac_motoboy/services/api_config.dart';
 import 'package:nhac_motoboy/services/entregador_service.dart';
+
 import 'entrega_provider_test.dart' show FakeEntregaService;
 
 class _Queries extends EntregadorService {
@@ -67,6 +68,9 @@ void main() {
     final font = FontLoader('Roboto')
       ..addFont(rootBundle.load('assets/fonts/Roboto.ttf'));
     await font.load();
+    final icons = FontLoader('MaterialIcons')
+      ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
+    await icons.load();
   });
   setUp(() async {
     SharedPreferences.setMockInitialValues({});

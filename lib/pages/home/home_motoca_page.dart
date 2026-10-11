@@ -1,3 +1,6 @@
+import '../../services/push_service.dart';
+import 'tabs/avisos_page.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -28,6 +31,18 @@ class _HomeMotocaPageState extends State<HomeMotocaPage> {
     _pageController = PageController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      PushService.shared.onOpen = (data) {
+        if (!mounted || !PushService.pertenceConta(data)) return;
+        if (data['tipo'] == 'OFERTA' && data['ofertaId'] != null) {
+          _onItemTapped(0);
+          context.read<EntregaProvider>().selecionarOferta(
+            data['ofertaId'].toString(),
+          );
+        } else {
+          abrirAviso(context, data);
+        }
+      };
+      PushService.shared.consumirInicial();
       context.read<UserProvider>().carregarDadosReais();
       context.read<EntregaProvider>().sincronizar();
     });
@@ -35,6 +50,7 @@ class _HomeMotocaPageState extends State<HomeMotocaPage> {
 
   @override
   void dispose() {
+    PushService.shared.onOpen = null;
     _pageController.dispose();
     super.dispose();
   }
@@ -65,18 +81,6 @@ class _HomeMotocaPageState extends State<HomeMotocaPage> {
         behavior: SnackBarBehavior.floating,
       ),
     );
-  }
-
-  Future<void> _sair() async {
-    try {
-      await context.read<EntregaProvider>().sair();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.toString())));
-      }
-    }
   }
 
   @override
@@ -115,18 +119,6 @@ class _HomeMotocaPageState extends State<HomeMotocaPage> {
                   ),
                 ),
               ),
-              actions: [
-                IconButton(
-                  tooltip: 'Sair da conta',
-                  icon: Icon(
-                    Icons.logout_rounded,
-                    color: AppColors.texto,
-                    size: 24.r,
-                  ),
-                  onPressed: _sair,
-                ),
-                SizedBox(width: 8.w),
-              ],
             ),
       body: Stack(
         children: [

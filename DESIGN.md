@@ -68,3 +68,7 @@ A confirmação de entrega usa um campo nativo com teclado numérico e quatro d�
 ## Query and tracking feedback
 
 Filtros de histórico e período usam ChoiceChip nativo do tema Nhac, com texto marrom no coral. O frete mantém o resumo durante atualização do mesmo período e apresenta erro junto da tentativa manual. `lib/utils/formatters.dart` centraliza reais em pt_BR. Listas crescentes usam construção sob demanda. A última sincronização aparece na home; localização durante corrida no Android tem notificação do sistema com texto operacional curto.
+
+## Atendimento, avisos e repasses
+
+As telas `SuporteEntregaPage`, `AvisosPage` e `RepassesPage` estendem `nhacTheme`, `AppTextStyles` e cartões do aplicativo. Formulários preservam dados em erro, exibem carregamento circular e impedem envio simultâneo. Avisos e repasses usam paginação explícita em lotes de 20. A saída da conta pertence somente ao menu de três pontos do Perfil, com confirmação antes do status offline e encerramento da sessão.

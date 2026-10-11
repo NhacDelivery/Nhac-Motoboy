@@ -1,3 +1,5 @@
+import 'suporte_entrega_page.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +11,93 @@ import '../../../components/entrega/mapa_rota_widget.dart';
 import '../../../controllers/entrega_provider.dart';
 import '../../../globals/theme_colors.dart';
 import '../../chat_page.dart';
+
+Future<void> _corrigirDestino(
+  BuildContext context,
+  EntregaProvider provider,
+) async {
+  final lat = TextEditingController(
+    text: provider.entregaAtiva?.entregaLatitude?.toString(),
+  );
+  final lng = TextEditingController(
+    text: provider.entregaAtiva?.entregaLongitude?.toString(),
+  );
+  final form = GlobalKey<FormState>();
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Confirmar coordenadas do cliente'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: form,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Confirme o destino com o cliente ou a loja. Informe as coordenadas do endereço; a posição do entregador pode ser diferente.',
+              ),
+              TextFormField(
+                controller: lat,
+                keyboardType: const TextInputType.numberWithOptions(
+                  signed: true,
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(labelText: 'Latitude'),
+                validator: (v) {
+                  final n = double.tryParse((v ?? '').replaceAll(',', '.'));
+                  return n == null || !n.isFinite || n.abs() > 90
+                      ? 'Latitude inválida'
+                      : null;
+                },
+              ),
+              TextFormField(
+                controller: lng,
+                keyboardType: const TextInputType.numberWithOptions(
+                  signed: true,
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(labelText: 'Longitude'),
+                validator: (v) {
+                  final n = double.tryParse((v ?? '').replaceAll(',', '.'));
+                  return n == null || !n.isFinite || n.abs() > 180
+                      ? 'Longitude inválida'
+                      : null;
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (form.currentState!.validate()) Navigator.pop(ctx, true);
+          },
+          child: const Text('Confirmar destino'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true) {
+    try {
+      await provider.corrigirDestino(
+        double.parse(lat.text.replaceAll(',', '.')),
+        double.parse(lng.text.replaceAll(',', '.')),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+  lat.dispose();
+  lng.dispose();
+}
 
 class RotaEntregaPage extends StatelessWidget {
   const RotaEntregaPage({super.key});
@@ -179,13 +268,14 @@ class RotaEntregaPage extends StatelessWidget {
                             borderRadius: BorderRadius.circular(20.r),
                             child: MapaRotaWidget(
                               rota: p.rotaAtual!,
+                              indoAteLoja: !p.entregaColetada,
                               latitude: p.latitudeAtual,
                               longitude: p.longitudeAtual,
                             ),
                           ),
                           SizedBox(height: 8.h),
                           Text(
-                            'Loja → cliente: ${p.rotaAtual!.distanciaKm.toStringAsFixed(1)} km • '
+                            '${p.entregaColetada ? 'Loja → cliente' : 'Você → loja'}: ${p.rotaAtual!.distanciaKm.toStringAsFixed(1)} km • '
                             'estimativa ${p.rotaAtual!.duracaoEstimadaMinutos} min',
                             style: AppTextStyles.subtitulo(),
                           ),
@@ -193,17 +283,19 @@ class RotaEntregaPage extends StatelessWidget {
                           Padding(
                             padding: EdgeInsets.only(top: 8.h),
                             child: TextButton(
-                              onPressed: () => p.carregarRota(
-                                active.pedidoId,
-                                tentarNovamente: true,
-                              ),
+                              onPressed: () => p.erroRotaDados
+                                  ? _corrigirDestino(context, p)
+                                  : p.carregarRota(
+                                      active.pedidoId,
+                                      tentarNovamente: true,
+                                    ),
                               style: TextButton.styleFrom(
                                 foregroundColor: AppColors.primaria,
                               ),
                               child: Text(
                                 p.erroRota == null
                                     ? 'Carregar mapa da corrida'
-                                    : '${p.erroRota} Tentar novamente',
+                                    : '${p.erroRota} ${p.erroRotaDados ? 'Confirmar destino' : 'Tentar novamente'}',
                               ),
                             ),
                           ),
@@ -279,16 +371,33 @@ class RotaEntregaPage extends StatelessWidget {
                                 ? active.enderecoEntrega?.formatado
                                 : active.lojaEndereco;
                             if ((lat == null || lng == null) &&
-                                (address == null || address.isEmpty)) {
+                                (address == null ||
+                                    address.isEmpty ||
+                                    address == 'Endereço não informado')) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Destino indisponível. Confirme o endereço com a loja.',
+                                  ),
+                                ),
+                              );
                               return;
                             }
-                            final uri =
-                                Uri.https('www.google.com', '/maps/dir/', {
-                                  'api': '1',
-                                  'destination': lat != null && lng != null
-                                      ? '$lat,$lng'
-                                      : address!,
-                                });
+                            final uri = Uri.https(
+                              'www.google.com',
+                              '/maps/dir/',
+                              {
+                                'api': '1',
+                                'travelmode':
+                                    p.perfilEntregador?.tipoVeiculo ==
+                                        'BICICLETA'
+                                    ? 'bicycling'
+                                    : 'driving',
+                                'destination': lat != null && lng != null
+                                    ? '$lat,$lng'
+                                    : address!,
+                              },
+                            );
                             try {
                               if (!await launchUrl(
                                 uri,
@@ -367,19 +476,11 @@ class RotaEntregaPage extends StatelessWidget {
                           ),
                         ],
                         TextButton.icon(
-                          onPressed: () => showDialog<void>(
-                            context: context,
-                            builder: (dialogContext) => AlertDialog(
-                              title: const Text('Problema com a corrida?'),
-                              content: const Text(
-                                'Converse com a loja para explicar o problema. A retirada da corrida requer atendimento e ainda não pode ser feita pelo aplicativo. Não confirme coleta ou entrega sem realizá-la.',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(dialogContext),
-                                  child: const Text('Entendi'),
-                                ),
-                              ],
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  SuporteEntregaPage(pedidoId: active.pedidoId),
                             ),
                           ),
                           icon: const Icon(Icons.help_outline),

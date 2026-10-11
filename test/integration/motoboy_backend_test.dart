@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
@@ -16,36 +15,8 @@ import 'package:nhac_motoboy/pages/home/tabs/confirmar_entrega_page.dart';
 import 'package:nhac_motoboy/services/api_client.dart';
 import 'package:nhac_motoboy/services/api_config.dart';
 import 'package:nhac_motoboy/services/entregador_service.dart';
-import 'package:nhac_motoboy/services/location_service.dart';
 
-// Flutter normalmente devolve HTTP 400 em testWidgets. Este binding permite
-// tráfego real exclusivamente nesta suíte opt-in, com destino loopback.
-class BackendIntegrationBinding extends AutomatedTestWidgetsFlutterBinding {
-  @override
-  bool get overrideHttpClient => false;
-}
-
-// A fronteira com o hardware é controlada; provider, HTTP, JWT, regras,
-// transações, repositórios e telas são os componentes reais.
-class IntegrationLocation extends LocationService {
-  double latitude = -23.550520, longitude = -46.633308;
-  @override
-  Future<String?> solicitarPermissao({bool request = true}) async => null;
-  @override
-  Future<Position?> obterPosicaoAtual({bool emEntrega = false}) async =>
-      Position(
-        latitude: latitude,
-        longitude: longitude,
-        timestamp: DateTime.now(),
-        accuracy: 5,
-        altitude: 0,
-        altitudeAccuracy: 0,
-        heading: 0,
-        headingAccuracy: 0,
-        speed: 0,
-        speedAccuracy: 0,
-      );
-}
+import 'integration_support.dart';
 
 const enabled = bool.fromEnvironment('RUN_INTEGRATION');
 
@@ -132,7 +103,11 @@ void main() {
     return p;
   }
 
-  Future<void> accept(EntregaProvider p, String order) async {
+  Future<void> accept(
+    EntregaProvider p,
+    String order, {
+    bool remoteCollect = false,
+  }) async {
     await actor('lojista', 'POST', '/api/v1/entregas/despachar/$order');
     await p.sincronizar();
     expect(p.ofertas.where((o) => o.pedidoId == order), hasLength(1));
@@ -152,7 +127,18 @@ void main() {
     expect(p.rotaAtual!.pedidoId, order);
     expect(p.rotaAtual!.waypoints, isNotEmpty);
     expect(p.entregaAtiva!.clienteTelefone, isNotEmpty);
-    expect(await p.confirmarColeta(), true);
+    final pickupRoute = p.rotaAtual;
+    if (remoteCollect) {
+      // A coleta foi confirmada no servidor, mas a resposta se perdeu no app.
+      await service.coletarPedido(order);
+      expect(p.entregaAtiva!.statusPedido, StatusPedido.preparando);
+      await p.sincronizar();
+      expect(identical(p.rotaAtual, pickupRoute), false);
+      expect(p.rotaAtual!.destino.latitude, closeTo(-23.551000, 0.000001));
+      expect(p.rotaAtual!.destino.longitude, closeTo(-46.634000, 0.000001));
+    } else {
+      expect(await p.confirmarColeta(), true);
+    }
     expect(p.entregaAtiva!.statusPedido, StatusPedido.saiuEntrega);
   }
 
@@ -228,7 +214,7 @@ void main() {
       late EntregaProvider p;
       final initialized = await tester.runAsync(() async {
         p = await driver('motoboy');
-        await accept(p, 'it-pedido');
+        await accept(p, 'it-pedido', remoteCollect: true);
         final freshProvider = EntregaProvider(
           service: service,
           automatic: false,
@@ -315,7 +301,7 @@ void main() {
           hasLength(1),
         );
         expect(history.itens.single.entregueEm, isNotNull);
-        expect(history.itens.single.enderecoEntrega, isNull);
+        expect(history.itens.single.enderecoEntrega, isNotNull);
         final estado = await service.obterEstado();
         expect(estado.entrega, isNull);
         expect(estado.perfil!.statusOperacional, 'ONLINE');

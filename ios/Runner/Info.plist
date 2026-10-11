@@ -67,7 +67,11 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>O Nhac usa sua localização para encontrar entregas próximas e acompanhar sua corrida enquanto o aplicativo está aberto.</string>
+    <string>O Nhac usa sua localização para encontrar entregas próximas e acompanhar uma corrida ativa, inclusive ao abrir a navegação.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Durante uma entrega ativa, sua localização permite acompanhar a corrida ao usar a navegação em segundo plano.</string>
+	<key>UIBackgroundModes</key>
+	<array><string>location</string><string>remote-notification</string></array>
 	<key>NSCameraUsageDescription</key>
 	<string>O Nhac usa a câmera para tirar sua foto de perfil.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

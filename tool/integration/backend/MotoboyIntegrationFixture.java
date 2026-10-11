@@ -38,6 +38,7 @@ public class MotoboyIntegrationFixture implements CommandLineRunner {
         usuario("motoboy", Papel.CLIENTE);
         usuario("bloqueio", Papel.CLIENTE);
         usuario("outro", Papel.CLIENTE);
+        usuario("integracao-admin", Papel.ADMIN);
 
         DadosOperacionais operacao = new DadosOperacionais();
         operacao.setTaxaEntregaBase(new BigDecimal("5.00"));
@@ -55,12 +56,12 @@ public class MotoboyIntegrationFixture implements CommandLineRunner {
         System.out.println("MOTOBOY_INTEGRATION_FIXTURE_READY");
     }
 
-    private Usuario usuario(String nome, Papel papel) {
+    Usuario usuario(String nome, Papel papel) {
         Usuario u = new Usuario();
         u.setId("it-" + nome);
         u.setNome("Integração " + nome);
         u.setEmail(nome + "@integration.nhac.local");
-        u.setTelefone("+5511999990001");
+        u.setTelefone(String.format("+55119999%05d",Math.abs(nome.hashCode()%100000)));
         u.setSenha(encoder.encode("NhacIntegration#123"));
         u.setPapel(papel);
         u.setAtivo(true);
@@ -70,7 +71,7 @@ public class MotoboyIntegrationFixture implements CommandLineRunner {
         return usuarios.saveAndFlush(u);
     }
 
-    private void pedido(String id, Usuario cliente, Loja loja) {
+    void pedido(String id, Usuario cliente, Loja loja) {
         Pedido p = new Pedido();
         p.setId(id);
         p.setUsuarioId(cliente.getId());

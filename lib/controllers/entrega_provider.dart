@@ -1,3 +1,5 @@
+import '../services/push_service.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -51,9 +53,12 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
       _gpsBusy = false,
       _disposed = false,
       _foreground = true;
-  bool _changingStatus = false, _pendingOffline = false, _routeLoading = false;
+  bool _changingStatus = false, _pendingOffline = false;
+  String? _routeLoadingFor;
+  int _routeRequestVersion = 0;
   Future<bool>? _offlineOperation;
   String? _routeRequestedFor;
+  bool erroRotaDados = false;
   DateTime? ultimaLocalizacaoEm, ultimaSincronizacaoEm;
   int entregasConcluidasRevision = 0;
   bool inicializado = false;
@@ -85,8 +90,34 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
   EntregaAtivaModel? get entregaAtiva => _entrega;
   RotaModel? get rotaAtual => _rota;
   List<OfertaEntregaModel> get ofertas => List.unmodifiable(_ofertas);
-  OfertaEntregaModel? get ofertaAtual =>
-      _ofertas.isEmpty ? null : _ofertas.first;
+  String? ofertaSelecionadaId;
+  Future<void> selecionarOferta(String id) async {
+    final epoch = _epoch;
+    try {
+      final novas = await _service.buscarOfertasPendentes();
+      if (!_valid(epoch)) return;
+      _ofertas
+        ..clear()
+        ..addAll(novas.where((o) => !o.expirada));
+      ofertaSelecionadaId = _ofertas.any((o) => o.id == id) ? id : null;
+      if (ofertaSelecionadaId == null) {
+        aviso = 'Esta oferta não está mais disponível.';
+      }
+      _notify();
+    } catch (e) {
+      if (_valid(epoch)) {
+        erro = e.toString();
+        _notify();
+      }
+    }
+  }
+
+  OfertaEntregaModel? get ofertaAtual => _ofertas.isEmpty
+      ? null
+      : _ofertas.firstWhere(
+          (o) => o.id == ofertaSelecionadaId,
+          orElse: () => _ofertas.first,
+        );
   int get segundosRestantes => ofertaAtual?.segundosEm(DateTime.now()) ?? 0;
   bool get entregaColetada =>
       _entrega?.statusPedido == StatusPedido.saiuEntrega;
@@ -105,6 +136,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     _perfil = null;
     _entrega = null;
     _rota = null;
+    ofertaSelecionadaId = null;
     _ofertas.clear();
     _avisosRecentes.clear();
     _status = StatusOperacional.offline;
@@ -115,7 +147,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     inicializado = false;
     _pendingOffline = false;
     _routeRequestedFor = null;
-    _routeLoading = false;
+    _routeLoadingFor = null;
     latitudeAtual = null;
     longitudeAtual = null;
     ultimaLocalizacaoEm = null;
@@ -176,11 +208,19 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
           return;
         }
         final previous = _entrega?.pedidoId;
+        final previousRoute = _routeKey;
         _entrega = active;
+        if (previousRoute != _routeKey) {
+          _rota = null;
+          _routeRequestedFor = null;
+          erroRota = null;
+          erroRotaDados = false;
+        }
         if (active == null) {
           _rota = null;
           _routeRequestedFor = null;
           erroRota = null;
+          erroRotaDados = false;
           if (previous != null) {
             aviso = 'A corrida foi encerrada. Seu status foi atualizado.';
             entregasConcluidasRevision++;
@@ -266,12 +306,14 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     required String placaVeiculo,
     String? modeloVeiculo,
     String? corVeiculo,
+    String? cnh,
   }) => _atualizarPerfil(
     () => _service.atualizarVeiculo(
       tipoVeiculo: tipoVeiculo,
       placaVeiculo: placaVeiculo,
       modeloVeiculo: modeloVeiculo,
       corVeiculo: corVeiculo,
+      cnh: cnh,
     ),
   );
   Future<void> atualizarDocumentos({
@@ -451,8 +493,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
         },
         onError: (Object error) {
           if (!_valid(epoch)) return;
-          erroLocalizacao =
-              'Não foi possível acompanhar o GPS. Abra o app e atualize sua localização.';
+          erroLocalizacao = 'Não foi possível acompanhar o GPS. Abra o app e atualize sua localização.';
           _notify();
         },
       );
@@ -524,8 +565,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     };
     void disconnected() {
       if (!_foreground || !_valid(connectionEpoch)) return;
-      avisoConexao =
-          'Atualizações em tempo real indisponíveis. As corridas continuam sendo consultadas automaticamente.';
+      avisoConexao = 'Atualizações em tempo real indisponíveis. As corridas continuam sendo consultadas automaticamente.';
       // Recalcula o intervalo de recuperação sem esperar o próximo polling.
       _start();
       _notify();
@@ -599,8 +639,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
       onError: (e) {
         if (e is ApiException && [400, 404, 409, 422].contains(e.status)) {
           _ofertas.removeWhere((o) => o.id == id);
-          aviso =
-              'Esta oferta não está mais disponível. Ela pode ter expirado ou sido aceita por outro entregador.';
+          aviso = 'Esta oferta não está mais disponível. Ela pode ter expirado ou sido aceita por outro entregador.';
         }
       },
     );
@@ -620,25 +659,62 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> carregarEntregaAtiva() => sincronizar();
+  // O backend troca o destino da loja para o cliente após a coleta e
+  // recalcula a rota quando as coordenadas do pedido são corrigidas.
+  String? get _routeKey => _entrega == null
+      ? null
+      : jsonEncode([
+          _entrega!.pedidoId,
+          _entrega!.statusPedido.api,
+          _entrega!.lojaLatitude,
+          _entrega!.lojaLongitude,
+          _entrega!.entregaLatitude,
+          _entrega!.entregaLongitude,
+        ]);
+
   Future<void> carregarRota(String id, {bool tentarNovamente = false}) async {
-    if (_routeLoading || (!tentarNovamente && _routeRequestedFor == id)) return;
-    _routeLoading = true;
-    _routeRequestedFor = id;
+    final key = _routeKey;
+    if (key == null ||
+        _entrega?.pedidoId != id ||
+        _routeLoadingFor == key ||
+        (!tentarNovamente && _routeRequestedFor == key)) {
+      return;
+    }
+    _routeLoadingFor = key;
+    _routeRequestedFor = key;
+    final version = ++_routeRequestVersion;
     final epoch = _epoch;
+    bool current() =>
+        _valid(epoch) && version == _routeRequestVersion && _routeKey == key;
     try {
       final route = await _service.obterRota(id);
-      if (_valid(epoch) && _entrega?.pedidoId == id) {
+      if (current()) {
         _rota = route;
         erroRota = null;
+        erroRotaDados = false;
       }
     } catch (e) {
-      if (_valid(epoch)) erroRota = e.toString();
+      if (current()) {
+        erroRota = e.toString();
+        erroRotaDados = e is ApiException && e.status == 422;
+      }
     } finally {
-      if (_valid(epoch)) {
-        _routeLoading = false;
+      if (_valid(epoch) && version == _routeRequestVersion) {
+        _routeLoadingFor = null;
         _notify();
       }
     }
+  }
+
+  Future<void> corrigirDestino(double latitude, double longitude) async {
+    final active = _entrega;
+    final epoch = _epoch;
+    if (active == null) throw StateError('Sem corrida ativa.');
+    await _service.corrigirDestino(active.pedidoId, latitude, longitude);
+    if (!_valid(epoch)) return;
+    await sincronizar();
+    if (!_valid(epoch)) return;
+    await carregarRota(active.pedidoId, tentarNovamente: true);
   }
 
   Future<bool> confirmarColeta() async {
@@ -647,7 +723,12 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     return _action(() async {
       final epoch = _epoch;
       final active = await _service.coletarPedido(id);
-      if (_valid(epoch)) _entrega = active;
+      if (_valid(epoch)) {
+        _entrega = active;
+        _rota = null;
+        _routeRequestedFor = null;
+        await carregarRota(id, tentarNovamente: true);
+      }
     });
   }
 
@@ -763,6 +844,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
         'Não foi possível ficar offline no servidor. Verifique a conexão e tente sair novamente.',
       );
     }
+    await PushService.shared.encerrar();
     await ApiConfig.limparSessao();
   }
 

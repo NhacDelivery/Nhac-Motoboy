@@ -79,6 +79,10 @@ final GoRouter appRouter = GoRouter(
       path: '/recuperar-senha',
       builder: (_, _) => const RecuperarSenhaPage(),
     ),
+    GoRoute(
+      path: '/recuperar-senha-conta',
+      builder: (_, _) => const RecuperarSenhaPage(),
+    ),
     GoRoute(path: '/home-motoca', builder: (_, _) => const HomeMotocaPage()),
     GoRoute(path: '/home-page', redirect: (_, _) => '/home-motoca'),
     GoRoute(path: '/editar-nome', builder: (_, _) => const EditarNomePage()),
