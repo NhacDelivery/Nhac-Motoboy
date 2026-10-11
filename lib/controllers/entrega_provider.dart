@@ -57,6 +57,8 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
   String? _routeLoadingFor;
   int _routeRequestVersion = 0;
   Future<bool>? _offlineOperation;
+  Completer<void>? _gpsIdle;
+  bool _actionGpsBlocked = false;
   String? _routeRequestedFor;
   bool erroRotaDados = false;
   DateTime? ultimaLocalizacaoEm, ultimaSincronizacaoEm;
@@ -143,6 +145,8 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     _busy = false;
     _syncing = false;
     _gpsBusy = false;
+    _gpsIdle = null;
+    _actionGpsBlocked = false;
     _changingStatus = false;
     inicializado = false;
     _pendingOffline = false;
@@ -430,8 +434,10 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<bool> atualizarLocalizacao({bool solicitar = false}) async {
-    if (_gpsBusy || !_foreground) return false;
+    if (_gpsBusy || _actionGpsBlocked || !_foreground) return false;
     _gpsBusy = true;
+    final gpsIdle = Completer<void>();
+    _gpsIdle = gpsIdle;
     final epoch = _epoch;
     try {
       final permission = await _location.solicitarPermissao(request: solicitar);
@@ -459,6 +465,8 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
       }
       return false;
     } finally {
+      gpsIdle.complete();
+      if (identical(_gpsIdle, gpsIdle)) _gpsIdle = null;
       if (_valid(epoch)) {
         _gpsBusy = false;
         _notify();
@@ -493,7 +501,8 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
         },
         onError: (Object error) {
           if (!_valid(epoch)) return;
-          erroLocalizacao = 'Não foi possível acompanhar o GPS. Abra o app e atualize sua localização.';
+          erroLocalizacao =
+              'Não foi possível acompanhar o GPS. Abra o app e atualize sua localização.';
           _notify();
         },
       );
@@ -504,9 +513,11 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _enviarPosicao(Position position, int epoch) async {
-    if (_gpsBusy || !_valid(epoch) || !emEntrega) return;
+    if (_gpsBusy || _actionGpsBlocked || !_valid(epoch) || !emEntrega) return;
     if (DateTime.now().difference(position.timestamp).inSeconds > 60) return;
     _gpsBusy = true;
+    final gpsIdle = Completer<void>();
+    _gpsIdle = gpsIdle;
     try {
       await _service.enviarLocalizacao(position.latitude, position.longitude);
       if (!_valid(epoch)) return;
@@ -517,6 +528,8 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     } catch (e) {
       if (_valid(epoch)) erroLocalizacao = e.toString();
     } finally {
+      gpsIdle.complete();
+      if (identical(_gpsIdle, gpsIdle)) _gpsIdle = null;
       if (_valid(epoch)) {
         _gpsBusy = false;
         _notify();
@@ -565,7 +578,8 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     };
     void disconnected() {
       if (!_foreground || !_valid(connectionEpoch)) return;
-      avisoConexao = 'Atualizações em tempo real indisponíveis. As corridas continuam sendo consultadas automaticamente.';
+      avisoConexao =
+          'Atualizações em tempo real indisponíveis. As corridas continuam sendo consultadas automaticamente.';
       // Recalcula o intervalo de recuperação sem esperar o próximo polling.
       _start();
       _notify();
@@ -639,7 +653,8 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
       onError: (e) {
         if (e is ApiException && [400, 404, 409, 422].contains(e.status)) {
           _ofertas.removeWhere((o) => o.id == id);
-          aviso = 'Esta oferta não está mais disponível. Ela pode ter expirado ou sido aceita por outro entregador.';
+          aviso =
+              'Esta oferta não está mais disponível. Ela pode ter expirado ou sido aceita por outro entregador.';
         }
       },
     );
@@ -773,7 +788,12 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     _notify();
     final epoch = _epoch;
     var success = false;
+    _actionGpsBlocked = true;
     try {
+      // A atualização de GPS e as ações da corrida alteram o entregador.
+      // Aguarda a escrita em andamento e impede novos envios durante a ação.
+      await _gpsIdle?.future;
+      if (!_valid(epoch)) return false;
       await operation();
       success = _valid(epoch);
     } catch (e) {
@@ -784,6 +804,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     } finally {
       if (_valid(epoch)) {
         _busy = false;
+        _actionGpsBlocked = false;
         _notify();
       }
     }

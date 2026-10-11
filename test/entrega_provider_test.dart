@@ -16,6 +16,7 @@ import 'package:nhac_motoboy/services/api_client.dart';
 import 'package:nhac_motoboy/services/entregador_service.dart';
 
 import 'fixtures.dart';
+import 'integration/integration_support.dart' show IntegrationLocation;
 
 class FakeEntregaService extends EntregadorService {
   String operational = 'ONLINE';
@@ -27,7 +28,15 @@ class FakeEntregaService extends EntregadorService {
   Completer<EntregadorCadastroModel?>? profileGate;
   Completer<RotaModel>? routeGate;
   Completer<void>? routeStarted;
-  int routeCalls = 0, statusCalls = 0;
+  int routeCalls = 0, statusCalls = 0, gpsCalls = 0;
+  Completer<void>? gpsGate, gpsStarted;
+  @override
+  Future<void> enviarLocalizacao(double latitude, double longitude) async {
+    gpsCalls++;
+    if (gpsStarted != null && !gpsStarted!.isCompleted) gpsStarted!.complete();
+    await gpsGate?.future;
+  }
+
   @override
   Future<EstadoEntregadorModel> obterEstado() async => EstadoEntregadorModel(
     perfil: await obterPerfil(),
@@ -373,26 +382,105 @@ void main() {
       expect(provider.isCadastrado, true);
     },
   );
-  test('código inválido mantém corrida e detalhes sem repetir conclusão automaticamente', () async {
-    service.current = active('SAIU_ENTREGA');
-    service.operational = 'EM_ENTREGA';
-    await provider.sincronizar();
-    service.finishError = const ApiException(
-      400,
-      'Código inválido.',
-      code: 'CODIGO_ENTREGA_INVALIDO',
-      details: {'tentativasRestantes': 4},
-    );
-    expect(await provider.concluirEntregaAtual(codigo: '0123'), false);
-    expect(service.finishCalls, 1);
-    expect(provider.entregaAtiva, isNotNull);
-    expect(provider.erroConclusao?.details, {'tentativasRestantes': 4});
-    expect(provider.podeConcluir, true);
-  });
+  test(
+    'código inválido mantém corrida e detalhes sem repetir conclusão automaticamente',
+    () async {
+      service.current = active('SAIU_ENTREGA');
+      service.operational = 'EM_ENTREGA';
+      await provider.sincronizar();
+      service.finishError = const ApiException(
+        400,
+        'Código inválido.',
+        code: 'CODIGO_ENTREGA_INVALIDO',
+        details: {'tentativasRestantes': 4},
+      );
+      expect(await provider.concluirEntregaAtual(codigo: '0123'), false);
+      expect(service.finishCalls, 1);
+      expect(provider.entregaAtiva, isNotNull);
+      expect(provider.erroConclusao?.details, {'tentativasRestantes': 4});
+      expect(provider.podeConcluir, true);
+    },
+  );
   test('conclusão sem quatro dígitos não chama o servidor', () async {
     service.current = active('SAIU_ENTREGA');
     await provider.sincronizar();
     expect(await provider.concluirEntregaAtual(codigo: ''), false);
     expect(service.finishCalls, 0);
   });
+  Future<void> pendingGps() async {
+    provider.dispose();
+    provider = EntregaProvider(
+      service: service,
+      locationService: IntegrationLocation(),
+      automatic: false,
+    );
+    service.current = active('SAIU_ENTREGA');
+    service.operational = 'EM_ENTREGA';
+    await provider.sincronizar();
+    service.gpsGate = Completer<void>();
+    service.gpsStarted = Completer<void>();
+  }
+
+  test(
+    'conclusão aguarda GPS em andamento e impede novo envio concorrente',
+    () async {
+      await pendingGps();
+      final gps = provider.atualizarLocalizacao();
+      await service.gpsStarted!.future;
+      final finish = provider.concluirEntregaAtual(codigo: '0123');
+      await Future<void>.delayed(Duration.zero);
+      expect(provider.isLoading, true);
+      expect(service.finishCalls, 0);
+      expect(await provider.atualizarLocalizacao(), false);
+      expect(service.gpsCalls, 1);
+      service.gpsGate!.complete();
+      expect(await gps, true);
+      expect(await finish, true);
+      expect(service.finishCalls, 1);
+      expect(provider.entregaAtiva, isNull);
+    },
+  );
+
+  test('falha de GPS libera conclusão sem repetir a ação', () async {
+    await pendingGps();
+    final gps = provider.atualizarLocalizacao();
+    await service.gpsStarted!.future;
+    final finish = provider.concluirEntregaAtual(codigo: '0123');
+    service.gpsGate!.completeError(const ApiException(503, 'GPS sem conexão'));
+    expect(await gps, false);
+    expect(await finish, true);
+    expect(service.finishCalls, 1);
+  });
+
+  test(
+    'troca de sessão cancela conclusão que aguarda GPS da conta anterior',
+    () async {
+      await pendingGps();
+      final gps = provider.atualizarLocalizacao();
+      await service.gpsStarted!.future;
+      final finish = provider.concluirEntregaAtual(codigo: '0123');
+      await ApiConfig.limparSessao();
+      service.gpsGate!.complete();
+      expect(await gps, false);
+      expect(await finish, false);
+      expect(service.finishCalls, 0);
+      expect(provider.entregaAtiva, isNull);
+    },
+  );
+  test('ficar online ainda obtém GPS antes de alterar o status', () async {
+    provider.dispose();
+    provider = EntregaProvider(
+      service: service,
+      locationService: IntegrationLocation(),
+      automatic: false,
+    );
+    service.operational = 'OFFLINE';
+    await provider.sincronizar();
+    await provider.alternarStatusOnline(true);
+    expect(service.gpsCalls, 1);
+    expect(service.statusCalls, 1);
+    expect(provider.estaOnline, true);
+    expect(provider.erro, isNull);
+  });
+
 }

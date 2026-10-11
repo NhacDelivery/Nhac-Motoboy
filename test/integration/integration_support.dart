@@ -145,6 +145,7 @@ class IntegrationScenario {
     String actor = 'a',
     bool online = true,
     String vehicle = 'MOTO',
+    EntregadorService? deliveryService,
   }) async {
     await use(actor);
     await service.cadastrarEntregador(
@@ -154,7 +155,7 @@ class IntegrationScenario {
       cpf: cpf(actor),
     );
     final p = EntregaProvider(
-      service: service,
+      service: deliveryService ?? service,
       locationService: IntegrationLocation(),
       automatic: false,
     );

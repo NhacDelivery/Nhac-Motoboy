@@ -22,7 +22,7 @@ Os identificadores abaixo aparecem no log. Há asserções do resultado e da per
 | Cadastro de entregador | 008 | CPF e CNH inválidos, duplicidade, bicicleta e mudança para moto |
 | Veículo e documentos | 008, 013 | Persistência, normalização da placa e bloqueio durante corrida |
 | Pix | 009 | CPF, celular, e-mail, UUID e chave inválida sem sobrescrever a anterior |
-| Disponibilidade e GPS | 010, 029 | GPS ausente/antigo, coordenadas inválidas, cadastro inativo, segundo plano e retomada |
+| Disponibilidade e GPS | 010, 029 | GPS ausente/antigo, coordenadas inválidas, cadastro inativo, segundo plano, retomada e GPS pendente ao concluir |
 | Ofertas | 011, 012, 027 | Recusa, expiração, proprietário, inexistência, concorrência e aviso persistido |
 | Corrida | 001–003, 013, 015, 022 | Aceite, retomada, coleta, conclusão, idempotência, código incorreto e bloqueio de outra corrida |
 | Rota e destino | 014 | Erro 422 por GPS antigo, recuperação, autorização, coordenadas inválidas e correção persistida |
@@ -54,3 +54,5 @@ Ainda exigem credenciais e aparelho: Google com conta real, recebimento de SMS/e
 A main atualmente consulta o cache de rota antes da validação de idade do GPS. O cenário 014 muda o destino pelo endpoint real para exigir cálculo novo e então verificar o erro 422. Uma rota já em cache pode continuar disponível com GPS antigo por até a expiração do cache (15 minutos); essa divergência está no backend e não é corrigida por esta suíte.
 
 A main retorna 403 (não 401) para JWT com assinatura inválida. O cenário 022 registra esse contrato e verifica a limpeza ao encerrar a sessão explicitamente; ele não afirma que o aplicativo encerra automaticamente a sessão após esse 403, que também representa falta de permissão legítima.
+
+O cenário 029 mantém a atualização GPS em trânsito ao solicitar a conclusão, usando uma barreira no transporte e liberando a chamada real em seguida. A conclusão deve aguardar o GPS e bloquear novos envios até terminar, evitando conflito de versão no registro do entregador. Quatro testes unitários verificam também falha do GPS, troca de sessão durante essa espera e aquisição de GPS antes de ficar online. A conclusão não é repetida automaticamente.

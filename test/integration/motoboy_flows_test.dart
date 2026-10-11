@@ -43,6 +43,33 @@ class FailFirstGainsClient extends http.BaseClient {
   }
 }
 
+// Mantém uma escrita GPS pendente até a ação de concluir ser iniciada.
+// Ambas as requisições seguem para o backend real após a liberação.
+class HeldLocationClient extends http.BaseClient {
+  final http.Client delegate;
+  Completer<void>? release;
+  Completer<void>? started;
+  int prematureFinishes = 0;
+  HeldLocationClient(this.delegate);
+  void hold() {
+    release = Completer<void>();
+    started = Completer<void>();
+  }
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    if (request.url.path.endsWith('/localizacao') && release != null) {
+      started!.complete();
+      await release!.future;
+    }
+    if (request.url.path.endsWith('/concluir') &&
+        release?.isCompleted == false) {
+      prematureFinishes++;
+    }
+    return delegate.send(request);
+  }
+}
+
 void main() {
   if (!integrationEnabled) {
     test(
@@ -1126,7 +1153,10 @@ void main() {
     'it-moto-029',
     'segundo plano encerra disponibilidade e preserva corrida em andamento',
     (h) async {
-      final p = await h.driver();
+      final transport = HeldLocationClient(h.client);
+      final p = await h.driver(
+        deliveryService: EntregadorService(client: transport),
+      );
       Future<void> waitStatus(String value) async {
         for (var i = 0; i < 100; i++) {
           final perfil = await h.request(
@@ -1151,10 +1181,25 @@ void main() {
       p.didChangeAppLifecycleState(AppLifecycleState.paused);
       await waitStatus('EM_ENTREGA');
       expect((await h.service.obterEntregaAtiva())!.pedidoId, h.order);
+      transport.hold();
       p.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await transport.started!.future.timeout(const Duration(seconds: 10));
       await p.sincronizar();
       expect(p.entregaAtiva!.pedidoId, h.order);
-      expect(await p.concluirEntregaAtual(codigo: '0123'), true);
+      final finish = p.concluirEntregaAtual(codigo: '0123');
+      try {
+        expect(p.isLoading, true);
+        expect(await p.atualizarLocalizacao(), false);
+        expect(transport.prematureFinishes, 0);
+      } finally {
+        transport.release!.complete();
+      }
+      expect(await finish, true, reason: p.erro);
+      expect(transport.prematureFinishes, 0);
+      expect(
+        (await h.service.buscarHistorico(force: true)).itens.single.pedidoId,
+        h.order,
+      );
     },
   );
 
