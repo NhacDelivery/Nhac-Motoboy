@@ -95,7 +95,7 @@ jobs:
             test/failures/**
           if-no-files-found: warn
           retention-days: 7
-      - run: flutter build web --release --dart-define=API_BASE_URL=https://backend-nhac.onrender.com
+      - run: flutter build web --release --dart-define=API_BASE_URL=https://backend-nhac.cloud.run
       - name: Conferir configuração de push no artefato
         run: |
           faltando=''
@@ -111,7 +111,7 @@ jobs:
       - name: APK com autenticação Google e configuração de push
         run: >-
           flutter build apk --debug
-          --dart-define=API_BASE_URL=https://backend-nhac.onrender.com
+          --dart-define=API_BASE_URL=https://backend-nhac.cloud.run
           --dart-define=GOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID"
           --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY"
           --dart-define=FIREBASE_APP_ID="$FIREBASE_APP_ID"
@@ -211,7 +211,7 @@ jobs:
           FIREBASE_MESSAGING_SENDER_ID: ${{ vars.FIREBASE_MESSAGING_SENDER_ID }}
         run: >-
           flutter build ios --debug --no-codesign
-          --dart-define=API_BASE_URL=https://backend-nhac.onrender.com
+          --dart-define=API_BASE_URL=https://backend-nhac.cloud.run
           --dart-define=GOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID"
           --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY"
           --dart-define=FIREBASE_IOS_APP_ID="$FIREBASE_IOS_APP_ID"

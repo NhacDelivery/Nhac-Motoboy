@@ -4,7 +4,7 @@ Aplicativo Flutter para entregadores do ecossistema Nhac. Permite ficar disponí
 
 ## Executar
 
-Requer Flutter compatível com Dart 3.11.5 ou superior. A URL padrão de API e WebSocket é `https://backend-nhac.onrender.com`; para usar produção, execute `flutter run` sem substituir `API_BASE_URL`. Em desenvolvimento local:
+Requer Flutter compatível com Dart 3.11.5 ou superior. A URL padrão de API e WebSocket é `https://backend-nhac.cloud.run`; para usar produção, execute `flutter run` sem substituir `API_BASE_URL`. Em desenvolvimento local:
 
 ```bash
 flutter pub get

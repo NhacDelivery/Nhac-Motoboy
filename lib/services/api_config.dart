@@ -11,7 +11,7 @@ class ApiConfig {
     const configured = String.fromEnvironment('API_BASE_URL');
     final value = configured.isNotEmpty
         ? configured
-        : 'https://backend-nhac.onrender.com';
+        : 'https://backend-nhac.cloud.run';
     final semBarra = value.replaceFirst(RegExp(r'/+$'), '');
     // Os services já incluem /api/v1 em cada rota. Aceitar também uma
     // API_BASE_URL terminando em /api/v1 evita duplicar o prefixo no CI/E2E.
