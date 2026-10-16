@@ -71,9 +71,6 @@ class _EmailMotocaPageState extends State<EmailMotocaPage> {
 
     setState(() => _isLoading = true);
 
-    // Antes disso, o botão "Continuar" só dava um delay fake de 300ms e
-    // navegava direto pra tela de senha, sem checar nada com o backend — o
-    // login por e-mail nunca chamava nenhuma API de verdade.
     final cadastroController = context.read<CadastroController>();
     cadastroController.setEmail(email);
 

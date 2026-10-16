@@ -47,10 +47,6 @@ class _ContinuarSenhaState extends State<ContinuarSenha> {
     super.dispose();
   }
 
-  /// Antes disto, este botão era 100% decorativo: um delay de 300ms e ia
-  /// direto pra home, sem nenhuma chamada ao backend. Qualquer senha, mesmo
-  /// errada, "logava com sucesso" — e como o token nunca era setado, toda
-  /// chamada de API autenticada depois disso saía sem Authorization.
   Future<void> logar() async {
     if (_isLoading) return;
     final email = context.read<CadastroController>().email;
