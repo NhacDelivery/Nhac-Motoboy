@@ -3,13 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
-/// Wrapper fino sobre o pacote geolocator.
-///
-/// Antes desta classe, a posição do motoboy era duas constantes fixas no
-/// Marco Zero de São Paulo (EntregaProvider._latitudeAtual/_longitudeAtual) —
-/// o pubspec.yaml nem tinha o pacote geolocator como dependência. Isso fazia
-/// o raio de 7 km do despacho (DespachoService, backend) nunca corresponder
-/// à posição real do entregador.
+/// Wrapper sobre o pacote geolocator.
 class LocationService {
   /// Solicita a permissão de localização e verifica se o serviço de GPS do
   /// aparelho está ligado. Deve ser chamado antes de qualquer tentativa de

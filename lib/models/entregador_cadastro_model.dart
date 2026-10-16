@@ -75,13 +75,7 @@ class EntregadorCadastroModel {
   }
 }
 
-/// Modelo que representa um erro de negócio retornado pela API.
-/// Campos alinhados com ErroPadraoDTO do backend (requestId, timestamp,
-/// status, error, title, message, details, path, suggestions) — 'mensagem'
-/// e 'caminho' nunca existiram na resposta real (o backend manda 'message'
-/// e 'path'), então toda mensagem de erro de negócio (ex: "Este e-mail já
-/// está em uso", "Placa já cadastrada") virava sempre o fallback genérico
-/// "Erro desconhecido" em vez do motivo real.
+/// Erro de negócio da API; os campos JSON usam `message` e `path`.
 class ErroPadraoDTO {
   final int status;
   final String mensagem;

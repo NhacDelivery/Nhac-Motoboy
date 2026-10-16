@@ -16,10 +16,7 @@ import '../../services/api_config.dart';
 import '../../services/auth_service.dart';
 import '../../utils/validators.dart';
 
-/// Etapa final do cadastro por e-mail: nome, telefone e senha, depois
-/// POST /api/v1/auth/registrar. Esta tela simplesmente não existia antes —
-/// o cadastro por e-mail (fora do fluxo SMS) não tinha como ser concluído
-/// no app do motoboy, mesmo com o backend já suportando o fluxo inteiro.
+/// Etapa final do cadastro por e-mail: POST /api/v1/auth/registrar.
 class CriarContaDadosPage extends StatefulWidget {
   const CriarContaDadosPage({super.key});
 
@@ -79,9 +76,7 @@ class _CriarContaDadosPageState extends State<CriarContaDadosPage> {
 
       if (!mounted) return;
 
-      // Popula o UserProvider já aqui com o que a pessoa acabou de digitar —
-      // sem isto, a tela de perfil ficava sem nome/telefone até a próxima
-      // vez que a home chamasse carregarDadosReais() (GET /entregador/perfil).
+      // Preenche o UserProvider com os dados do cadastro.
       context.read<UserProvider>().setUsuario(
             id: id,
             nome: _nomeController.text.trim(),

@@ -10,10 +10,6 @@ import '../../../globals/theme_colors.dart';
 import '../../../models/ganhos_entregador_model.dart';
 import '../../../services/entregador_service.dart';
 
-/// Antes, esta tela era inteiramente estática: "Saldo Disponível: R$ 0,00"
-/// era um texto fixo no código-fonte, sem nenhuma chamada ao backend -
-/// mesmo com GET /api/v1/entregador/ganhos (V039) já existindo pra alimentar
-/// exatamente isto.
 class GanhosTab extends StatefulWidget {
   final EntregadorService? service;
   const GanhosTab({super.key, this.service});
@@ -102,10 +98,6 @@ class _GanhosTabState extends State<GanhosTab> {
         }
       });
     } on EntregadorNaoCadastradoException {
-      // Antes, isto caía no mesmo "erro genérico, tente novamente" que um
-      // problema de rede de verdade — mas a pessoa só ainda não completou
-      // o cadastro de entregador, o que não é bem um "erro" do ponto de
-      // vista dela.
       if (!mounted || requestId != _requestId) return;
       setState(() {
         _carregando = false;
