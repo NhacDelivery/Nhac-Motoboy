@@ -1,9 +1,17 @@
 name: Flutter CI
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, 'feature/**', 'fix/**', 'ci/**']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   integration:
@@ -51,6 +59,8 @@ jobs:
           if-no-files-found: error
           retention-days: 7
   test:
+    name: Analyze, Test & Web
+    timeout-minutes: 20
     env:
       GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID || '261563193700-snhkp8paeqme3ilopc22unio3b1g7a3o.apps.googleusercontent.com' }}
       FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
@@ -70,18 +80,6 @@ jobs:
           flutter-version: '3.47.6'
           cache: true
       - run: flutter config --jdk-dir="$JAVA_HOME_17_X64"
-      - name: Definir caminho da chave de teste
-        run: echo "NHAC_DEBUG_KEYSTORE=$RUNNER_TEMP/motoboy-debug.keystore" >> "$GITHUB_ENV"
-      - name: Preservar certificado do APK de teste
-        uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}/motoboy-debug.keystore
-          key: motoboy-android-debug-key-v2-${{ runner.os }}
-      - name: Preparar chave estável do APK de teste
-        run: |
-          if [[ ! -f "$NHAC_DEBUG_KEYSTORE" ]]; then
-            keytool -genkeypair -noprompt -storetype JKS -keystore "$NHAC_DEBUG_KEYSTORE" -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          fi
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
@@ -96,6 +94,44 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
       - run: flutter build web --release --dart-define=API_BASE_URL=https://backend-nhac.cloud.run
+
+  build-debug:
+    name: Build Debug APK
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID || '261563193700-snhkp8paeqme3ilopc22unio3b1g7a3o.apps.googleusercontent.com' }}
+      FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+      FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
+      FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+      FIREBASE_MESSAGING_SENDER_ID: ${{ vars.FIREBASE_MESSAGING_SENDER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.6'
+          cache: true
+      - uses: gradle/actions/setup-gradle@v4
+      - run: flutter config --jdk-dir="$JAVA_HOME_17_X64"
+      - name: Definir caminho da chave de teste
+        run: echo "NHAC_DEBUG_KEYSTORE=$RUNNER_TEMP/motoboy-debug.keystore" >> "$GITHUB_ENV"
+      - name: Preservar certificado do APK de teste
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/motoboy-debug.keystore
+          key: motoboy-android-debug-key-v2-${{ runner.os }}
+      - name: Preparar chave estável do APK de teste
+        run: |
+          if [[ ! -f "$NHAC_DEBUG_KEYSTORE" ]]; then
+            keytool -genkeypair -noprompt -storetype JKS -keystore "$NHAC_DEBUG_KEYSTORE" -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+      - run: flutter pub get
       - name: Conferir configuração de push no artefato
         run: |
           faltando=''
@@ -129,14 +165,19 @@ jobs:
           "$apk_signer" verify --print-certs build/app/outputs/flutter-apk/app-debug.apk > android-debug-certificate.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: nhac-motoboy-android-certificate
+          name: nhac-motoboy-android-certificate-${{ github.run_number }}
           path: android-debug-certificate.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: nhac-motoboy-debug
+          name: nhac-motoboy-debug-${{ github.run_number }}
           path: build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 7
+      - name: Link de download do APK
+        run: |
+          echo "### APK Android de teste" >> "$GITHUB_STEP_SUMMARY"
+          echo "Baixe **nhac-motoboy-debug-${{ github.run_number }}** em Artifacts desta execução e extraia app-debug.apk." >> "$GITHUB_STEP_SUMMARY"
+          echo "Backend: https://backend-nhac.cloud.run. Assinatura de desenvolvimento; não é uma release de produção." >> "$GITHUB_STEP_SUMMARY"
 
   device:
     name: Aplicativo completo em emulador Android
