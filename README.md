@@ -97,3 +97,21 @@ Frete e histórico têm cache de sessão de 45 s; avaliações, 1 min; perfil de
 No Android, o GPS durante corrida usa o stream do geolocator com serviço de localização e notificação. Abrir Maps preserva esse stream; finalizar encerra rastreamento. Encerrar o processo não reinicia o serviço. Teste automatizado valida o ciclo de vida do provider; validação em aparelho com GPS, Maps e economia de bateria permanece necessária. iOS/web mantêm atualização em primeiro plano.
 
 Histórico oferece filtros por status e construção de cards sob demanda. Frete mantém dados do mesmo período em falha e usa valores em pt_BR. Testes novos cobrem cache, troca de conta, edição concorrente, GPS pausado e telas em 320 px com texto ampliado.
+
+
+## Baixar o APK pelo GitHub Actions
+
+Em **Actions → Flutter CI**, abra uma execução aprovada e baixe o artefato
+`nhac-motoboy-debug-<número>` na seção **Artifacts**. Extraia `app-debug.apk`
+e instale no Android. O job **Build Debug APK** roda após análise, testes e Web,
+independentemente dos jobs de integração, emulador e iOS.
+
+O workflow roda em PRs, pushes na `main`, `feature/**`, `fix/**`, `ci/**` e
+manualmente por **Run workflow** (após integrar o workflow na branch padrão).
+O APK usa o Cloud Run e preserva as configurações Google/Firebase e o cache
+do certificado de desenvolvimento. A ausência das variáveis Firebase é indicada
+no resumo e desativa push; não são criadas credenciais fictícias.
+
+É um APK **debug**, assinado para desenvolvimento. Não é uma distribuição
+release para loja. O certificado público acompanha o APK em outro artefato;
+o keystore não é publicado nos artefatos. Retenção do APK: sete dias.
