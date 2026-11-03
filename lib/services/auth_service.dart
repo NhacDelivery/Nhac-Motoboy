@@ -23,28 +23,28 @@ class AuthService {
     await _post('/api/v1/auth/enviar-codigo-cadastro', {'email': email});
   }
 
-  Future<void> confirmarEmailCadastro(String email, String codigo) async {
-    await _post('/api/v1/auth/confirmar-email-cadastro', {
-      'email': email,
-      'codigo': codigo,
-    });
-  }
+  Future<String> confirmarEmailCadastro(String email, String codigo) async =>
+      (await _post('/api/v1/auth/confirmar-email-cadastro', {
+        'email': email,
+        'codigo': codigo,
+      }))['tokenCadastro'] as String;
 
-  Future<String> registrar({
-    required String id,
+  Future<Map<String, dynamic>> registrar({
     required String nome,
     required String email,
     required String telefone,
     required String senha,
+    required String tokenCadastro,
   }) async =>
-      (await _post('/api/v1/auth/registrar', {
-            'id': id,
-            'nome': nome,
-            'email': email,
-            'telefone': telefone,
-            'senha': senha,
-          }))['token']
-          as String;
+      Map<String, dynamic>.from(
+        await _post('/api/v1/auth/registrar', {
+          'nome': nome,
+          'email': email,
+          'telefone': telefone,
+          'senha': senha,
+          'tokenCadastro': tokenCadastro,
+        }) as Map,
+      );
   Future<String> login(String email, String senha) async =>
       (await _post('/api/v1/auth/login', {
             'email': email,

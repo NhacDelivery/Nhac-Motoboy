@@ -11,6 +11,7 @@ import '../../components/seta_voltar.dart';
 import '../../controllers/cadastro_controller.dart';
 import '../../globals/theme_colors.dart';
 import '../../globals/ui_utils.dart';
+import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 
 /// Segunda etapa do cadastro por e-mail (a primeira, EmailMotocaPage, já
@@ -63,6 +64,26 @@ class _CriarContaCodigoPageState extends State<CriarContaCodigoPage> {
     });
   }
 
+  String _formatarErro(Object error) {
+    if (error is ApiException) {
+      final details = error.details;
+      if (details != null) {
+        if (details is Map && details.isNotEmpty) {
+          final detalhesStr = details.entries
+              .map((e) => '${e.key}: ${e.value}')
+              .join(', ');
+          return '${error.message} ($detalhesStr)';
+        } else if (details is List && details.isNotEmpty) {
+          return '${error.message} (${details.join(', ')})';
+        } else if (details.toString().trim().isNotEmpty) {
+          return '${error.message} ($details)';
+        }
+      }
+      return error.message;
+    }
+    return error.toString().replaceAll('Exception: ', '');
+  }
+
   Future<void> _reenviarCodigo() async {
     if (!_podeReenviar || _reenviando) return;
     setState(() => _reenviando = true);
@@ -75,7 +96,7 @@ class _CriarContaCodigoPageState extends State<CriarContaCodigoPage> {
     } catch (e) {
       if (mounted) {
         setState(
-          () => _errorMessage = e.toString().replaceAll('Exception: ', ''),
+          () => _errorMessage = _formatarErro(e),
         );
       }
     } finally {
@@ -106,9 +127,10 @@ class _CriarContaCodigoPageState extends State<CriarContaCodigoPage> {
       final email = context.read<CadastroController>().email;
       final codigo = _pinController.text.trim();
 
-      await _authService.confirmarEmailCadastro(email, codigo);
+      final token = await _authService.confirmarEmailCadastro(email, codigo);
 
       if (!mounted) return;
+      context.read<CadastroController>().setTokenCadastro(token);
       context.showSuccess('E-mail verificado!');
       context.push('/criar-conta-dados');
     } catch (e) {
@@ -116,7 +138,7 @@ class _CriarContaCodigoPageState extends State<CriarContaCodigoPage> {
       _pinController.clear();
       setState(() {
         _codigoValido = false;
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = _formatarErro(e);
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);

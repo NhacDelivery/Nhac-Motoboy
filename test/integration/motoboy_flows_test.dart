@@ -134,11 +134,11 @@ void main() {
       expect(await h.auth.checarEmail(email), false);
       await expectLater(
         h.auth.registrar(
-          id: uuid.v4(),
           nome: 'Nova Entregadora',
           email: email,
           telefone: '+5511987654321',
           senha: integrationPassword,
+          tokenCadastro: 'invalido',
         ),
         throwsA(apiError(400)),
       );
@@ -151,24 +151,25 @@ void main() {
         ),
         throwsA(apiError(400)),
       );
-      await h.auth.confirmarEmailCadastro(email, code);
-      final token = await h.auth.registrar(
-        id: uuid.v4(),
+      final tokenCadastro = await h.auth.confirmarEmailCadastro(email, code);
+      final resp = await h.auth.registrar(
         nome: 'Nova Entregadora',
         email: email,
         telefone: '+5511987654321',
         senha: integrationPassword,
+        tokenCadastro: tokenCadastro,
       );
+      final token = resp['token'] as String;
       await ApiConfig.setAuthToken(token);
       expect((await h.users.obterUsuario())['nome'], 'Nova Entregadora');
       expect(await h.auth.checarEmail(email), true);
       await expectLater(
         h.auth.registrar(
-          id: uuid.v4(),
           nome: 'Duplicada',
           email: email,
           telefone: '+5511987654322',
           senha: integrationPassword,
+          tokenCadastro: tokenCadastro,
         ),
         throwsA(apiError(400)),
       );

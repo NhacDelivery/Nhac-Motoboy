@@ -6,6 +6,7 @@ class CadastroController extends ChangeNotifier {
   String _telefone = '';
   String _verificationId = '';
   String _senha = '';
+  String _tokenCadastro = '';
 
   /// Resultado de AuthService.checarEmail(), setado pela tela de e-mail.
   /// null = ainda não checado; true = conta já existe (fluxo de login);
@@ -17,7 +18,13 @@ class CadastroController extends ChangeNotifier {
   String get telefone => _telefone;
   String get verificationId => _verificationId;
   String get senha => _senha;
+  String get tokenCadastro => _tokenCadastro;
   bool? get emailExiste => _emailExiste;
+
+  void setTokenCadastro(String v) {
+    _tokenCadastro = v;
+    notifyListeners();
+  }
 
   void setNome(String novoNome) {
     _nome = novoNome;
@@ -50,6 +57,7 @@ class CadastroController extends ChangeNotifier {
   }
 
   void limparDados() {
+    _tokenCadastro = '';
     _email = '';
     _nome = '';
     _telefone = '';

@@ -3,7 +3,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../components/botoes/botao_largo_nhac.dart';
 import '../../components/nhac_input_field.dart';
@@ -12,6 +11,7 @@ import '../../controllers/cadastro_controller.dart';
 import '../../controllers/user_provider.dart';
 import '../../globals/theme_colors.dart';
 import '../../globals/ui_utils.dart';
+import '../../services/api_client.dart';
 import '../../services/api_config.dart';
 import '../../services/auth_service.dart';
 import '../../utils/validators.dart';
@@ -50,6 +50,26 @@ class _CriarContaDadosPageState extends State<CriarContaDadosPage> {
     super.dispose();
   }
 
+  String _formatarErro(Object error) {
+    if (error is ApiException) {
+      final details = error.details;
+      if (details != null) {
+        if (details is Map && details.isNotEmpty) {
+          final detalhesStr = details.entries
+              .map((e) => '${e.key}: ${e.value}')
+              .join(', ');
+          return '${error.message} ($detalhesStr)';
+        } else if (details is List && details.isNotEmpty) {
+          return '${error.message} (${details.join(', ')})';
+        } else if (details.toString().trim().isNotEmpty) {
+          return '${error.message} ($details)';
+        }
+      }
+      return error.message;
+    }
+    return error.toString().replaceAll('Exception: ', '');
+  }
+
   Future<void> _finalizarCadastro() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
@@ -58,22 +78,26 @@ class _CriarContaDadosPageState extends State<CriarContaDadosPage> {
       _errorMessage = null;
     });
 
+    final cadastro = context.read<CadastroController>();
+
     try {
-      final email = context.read<CadastroController>().email;
+      if (cadastro.tokenCadastro.isEmpty) {
+        throw Exception('Confirme seu e-mail novamente para concluir o cadastro.');
+      }
+
       final telefoneDigitos = _telefoneController.text.replaceAll(RegExp(r'\D'), '');
       final telefoneFormatado = '+55$telefoneDigitos';
 
-      // RegistroRequestDTO exige um id gerado pelo cliente (@NotBlank String
-      // id) — não é o backend quem atribui.
-      final id = const Uuid().v4();
-
-      final token = await _authService.registrar(
-        id: id,
+      final resp = await _authService.registrar(
         nome: _nomeController.text.trim(),
-        email: email,
+        email: cadastro.email,
         telefone: telefoneFormatado,
         senha: _senhaController.text,
+        tokenCadastro: cadastro.tokenCadastro,
       );
+
+      final token = resp['token'] as String;
+      final id = (resp['usuarioId'] ?? '').toString();
 
       await ApiConfig.setAuthToken(token);
 
@@ -85,9 +109,11 @@ class _CriarContaDadosPageState extends State<CriarContaDadosPage> {
       context.read<UserProvider>().setUsuario(
             id: id,
             nome: _nomeController.text.trim(),
-            email: email,
+            email: cadastro.email,
             telefone: telefoneFormatado,
           );
+
+      cadastro.limparDados();
 
       setState(() => _isLoading = false);
 
@@ -97,9 +123,28 @@ class _CriarContaDadosPageState extends State<CriarContaDadosPage> {
       context.go('/cadastro-motoboy');
     } catch (e) {
       if (!mounted) return;
+
+      final msg = _formatarErro(e);
+      final erroToken = msg.contains('inválida, expirada ou já utilizada') ||
+          msg.contains('já utilizada') ||
+          msg.contains('expirad') ||
+          msg.contains('Confirme seu e-mail novamente') ||
+          cadastro.tokenCadastro.isEmpty;
+
+      if (erroToken) {
+        cadastro.setTokenCadastro('');
+        setState(() {
+          _isLoading = false;
+          _errorMessage = msg;
+        });
+        context.showError(msg);
+        context.go('/criar-conta-codigo');
+        return;
+      }
+
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = msg;
       });
     }
   }
