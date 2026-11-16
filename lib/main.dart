@@ -1,6 +1,7 @@
-import 'services/push_service.dart';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'services/push_service.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
@@ -19,8 +20,10 @@ Future<void> main() async {
   // inicial com ApiConfig.authToken ainda nulo mesmo que a pessoa já
   // estivesse logada, e ela cairia sempre na tela de boas-vindas.
   await ApiConfig.init();
-  await PushService.shared.init();
 
+  // Push/Firebase não pode bloquear a abertura do app. Em aparelhos com
+  // configuração Firebase incompleta ou serviço indisponível, a tela de
+  // autenticação ainda precisa aparecer normalmente.
   runApp(
     MultiProvider(
       providers: [
@@ -30,6 +33,12 @@ Future<void> main() async {
       ],
       child: const MeuApp(),
     ),
+  );
+
+  unawaited(
+    PushService.shared.init().catchError((Object error) {
+      debugPrint('Falha ao inicializar notificações: $error');
+    }),
   );
 }
 
