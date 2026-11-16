@@ -125,9 +125,22 @@ public class MotoboyScenarioController {
     public Map<String,String> codigo(@RequestParam(required=false) String email,
             @RequestParam(required=false) String telefone) {
         if ((email == null) == (telefone == null)) throw new IllegalArgumentException("Informe uma identidade.");
-        if (email != null) return Map.of("codigo", emails
-                .findTopByEmailAndUtilizadoFalseAndDataExpiracaoAfterOrderByCriadoEmDesc(email, LocalDateTime.now())
-                .orElseThrow().getCodigo());
+        if (email != null) {
+            var limite = LocalDateTime.now();
+            // O backend separa os códigos por finalidade (CADASTRO e
+            // RESET_SENHA). O endpoint de fixture devolve o código mais
+            // recente entre os dois fluxos, sem depender de método removido.
+            var cadastro = emails
+                    .findTopByEmailAndTipoAndUtilizadoFalseAndDataExpiracaoAfterOrderByCriadoEmDesc(
+                            email, CodigoVerificacaoEmail.TipoCodigo.CADASTRO, limite);
+            var reset = emails
+                    .findTopByEmailAndTipoAndUtilizadoFalseAndDataExpiracaoAfterOrderByCriadoEmDesc(
+                            email, CodigoVerificacaoEmail.TipoCodigo.RESET_SENHA, limite);
+            var codigo = cadastro.isEmpty() ? reset
+                    : reset.isEmpty() || cadastro.get().getCriadoEm().isAfter(reset.get().getCriadoEm())
+                            ? cadastro : reset;
+            return Map.of("codigo", codigo.orElseThrow().getCodigo());
+        }
         return Map.of("codigo", sms
                 .findTopByTelefoneAndUtilizadoFalseAndDataExpiracaoAfterOrderByCriadoEmDesc(telefone, LocalDateTime.now())
                 .orElseThrow().getCodigo());
