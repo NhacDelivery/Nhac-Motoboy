@@ -369,7 +369,13 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     _notify();
     final epoch = _epoch;
     try {
-      if (online && !await atualizarLocalizacao(solicitar: true)) return;
+      if (online &&
+          !await atualizarLocalizacao(
+            solicitar: true,
+            aguardarAtualizacaoEmAndamento: true,
+          )) {
+        return;
+      }
       if (!_valid(epoch)) return;
       final profile = await _service.atualizarStatus(
         online ? StatusOperacional.online : StatusOperacional.offline,
@@ -433,7 +439,16 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  Future<bool> atualizarLocalizacao({bool solicitar = false}) async {
+  Future<bool> atualizarLocalizacao({
+    bool solicitar = false,
+    bool aguardarAtualizacaoEmAndamento = false,
+  }) async {
+    // Ao tocar em ONLINE, pode já existir uma leitura iniciada pelo retorno
+    // do app ao primeiro plano. Não falhe silenciosamente nesse caso: espere
+    // a leitura terminar e faça a leitura exigida para habilitar o entregador.
+    if (_gpsBusy && aguardarAtualizacaoEmAndamento) {
+      await _gpsIdle?.future;
+    }
     if (_gpsBusy || _actionGpsBlocked || !_foreground) return false;
     _gpsBusy = true;
     final gpsIdle = Completer<void>();
