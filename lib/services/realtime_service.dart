@@ -12,16 +12,32 @@ class RealtimeService {
   void Function(String)? onError;
   void Function()? onDisconnected;
   bool get connected => _client?.connected == true;
+
   void connect() {
     if (_client != null || !ApiConfig.temSessaoSalva) return;
+
+    // O token pode ser renovado enquanto o app permanece aberto. O mapa é
+    // atualizado antes de cada tentativa, inclusive nas reconexões automáticas.
+    final connectHeaders = <String, String>{};
+
     _client = StompClient(
       config: StompConfig(
         url: ApiConfig.wsUrl,
-        stompConnectHeaders: {'Authorization': 'Bearer ${ApiConfig.authToken}'},
+        stompConnectHeaders: connectHeaders,
+        beforeConnect: () async {
+          final token = ApiConfig.authToken;
+          if (token == null || token.isEmpty) {
+            throw StateError('Sessão expirada. Entre novamente.');
+          }
+          connectHeaders['Authorization'] = 'Bearer $token';
+        },
         reconnectDelay: const Duration(seconds: 5),
         connectionTimeout: const Duration(seconds: 15),
-        heartbeatIncoming: Duration.zero,
-        heartbeatOutgoing: const Duration(seconds: 10),
+        // Heartbeats STOMP detectam conexões que ficaram silenciosamente
+        // interrompidas; ping WebSocket ajuda a manter o túnel ativo.
+        heartbeatIncoming: const Duration(seconds: 20),
+        heartbeatOutgoing: const Duration(seconds: 20),
+        pingInterval: const Duration(seconds: 25),
         onConnect: (_) {
           _subscriptions.clear();
           for (final topic in _listeners.keys) {
@@ -31,10 +47,11 @@ class RealtimeService {
         },
         onWebSocketDone: () => onDisconnected?.call(),
         onDisconnect: (_) => onDisconnected?.call(),
-        onStompError: (frame) =>
-            onError?.call(frame.body ?? 'Conexão em tempo real indisponível.'),
+        onStompError: (frame) => onError?.call(
+          frame.body ?? 'O servidor recusou a conexão em tempo real.',
+        ),
         onWebSocketError: (_) => onError?.call(
-          'Conexão em tempo real indisponível. Tentando reconectar.',
+          'Falha na conexão em tempo real. Tentando reconectar.',
         ),
       ),
     );
