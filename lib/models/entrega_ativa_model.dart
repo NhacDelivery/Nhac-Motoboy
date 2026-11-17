@@ -57,6 +57,7 @@ class EntregaAtivaModel {
   final String? lojaId;
   final String lojaNome;
   final String lojaEndereco;
+  final String? lojaTelefone;
   final double? lojaLatitude;
   final double? lojaLongitude;
   final String clienteNome;
@@ -75,6 +76,7 @@ class EntregaAtivaModel {
     this.lojaId,
     required this.lojaNome,
     required this.lojaEndereco,
+    this.lojaTelefone,
     this.lojaLatitude,
     this.lojaLongitude,
     required this.clienteNome,
@@ -95,6 +97,7 @@ class EntregaAtivaModel {
       lojaId: json['lojaId']?.toString(),
       lojaNome: json['lojaNome']?.toString() ?? 'Restaurante',
       lojaEndereco: json['lojaEndereco']?.toString() ?? '',
+      lojaTelefone: json['lojaTelefone']?.toString(),
       lojaLatitude: json['lojaLatitude'] != null
           ? (json['lojaLatitude'] as num).toDouble()
           : null,
