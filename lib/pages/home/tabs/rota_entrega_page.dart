@@ -172,8 +172,9 @@ class RotaEntregaPage extends StatelessWidget {
       if (await launchUrl(
         Uri(scheme: 'tel', path: numero),
         mode: LaunchMode.externalApplication,
-      ))
+      )) {
         return;
+      }
     } catch (_) {
       // Falha ao abrir o discador: disponibiliza o número para ligação manual.
     }
