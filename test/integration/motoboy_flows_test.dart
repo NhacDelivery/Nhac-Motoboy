@@ -187,7 +187,7 @@ void main() {
     'recuperar e alterar senha, código consumido e senha antiga rejeitada',
     (h) async {
       await h.auth.recuperarSenha(h.email());
-      final code = await h.code(email: h.email());
+      final code = await h.code(email: h.email(), passwordReset: true);
       await h.auth.redefinirSenha(h.email(), code, 'NovaSenha#987');
       await expectLater(
         h.auth.redefinirSenha(h.email(), code, 'OutraSenha#456'),

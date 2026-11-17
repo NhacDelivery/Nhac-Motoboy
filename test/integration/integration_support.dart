@@ -137,10 +137,19 @@ class IntegrationScenario {
   Future<void> use(String actor) => ApiConfig.setAuthToken(tokens[actor]!);
   Future<dynamic> control(String path, {String method = 'POST'}) =>
       request('admin', method, '/api/v1/suporte/motoboy-it$path');
-  Future<String> code({String? email, String? phone}) async => (await control(
-    '/codigo?${email != null ? 'email=${Uri.encodeQueryComponent(email)}' : 'telefone=${Uri.encodeQueryComponent(phone!)}'}',
-    method: 'GET',
-  ))['codigo'];
+  Future<String> code({
+    String? email,
+    String? phone,
+    bool passwordReset = false,
+  }) async {
+    final query = email != null
+        ? Uri(queryParameters: {
+            'email': email,
+            if (passwordReset) 'tipo': 'RESET_SENHA',
+          }).query
+        : Uri(queryParameters: {'telefone': phone!}).query;
+    return (await control('/codigo?$query', method: 'GET'))['codigo'];
+  }
   Future<EntregaProvider> driver({
     String actor = 'a',
     bool online = true,
