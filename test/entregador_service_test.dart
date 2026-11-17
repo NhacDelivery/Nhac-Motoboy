@@ -61,6 +61,22 @@ void main() {
       expect(missing, 1);
     },
   );
+  test('envia justificativa para liberar somente a corrida', () async {
+    final s = service((r) async {
+      expect(r.method, 'POST');
+      expect(r.url.path, '/api/v1/entregas/p1/desistir');
+      expect(jsonDecode(r.body), {
+        'id': 'desistencia',
+        'descricao': 'Imprevisto com a moto',
+      });
+      return http.Response('', 204);
+    });
+    await s.desistirEntrega(
+      'p1',
+      id: 'desistencia',
+      descricao: 'Imprevisto com a moto',
+    );
+  });
   test('cadastro inclui CPF obrigatório e contrato de veículo', () async {
     final s = service((r) async {
       expect(r.url.path, '/api/v1/entregador/cadastro');

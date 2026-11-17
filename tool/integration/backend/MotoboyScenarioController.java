@@ -30,12 +30,14 @@ public class MotoboyScenarioController {
     private final OfertaEntregaRepository ofertas;
     private final CodigoVerificacaoEmailRepository emails;
     private final CodigoVerificacaoRepository sms;
+    private final MotoboyIntegrationRateLimit rateLimit;
     private final AtomicInteger sequence = new AtomicInteger(100);
 
     public MotoboyScenarioController(MotoboyIntegrationFixture fixture,
             UsuarioRepository usuarios, EntregadorRepository entregadores, LojaRepository lojas,
             PedidoRepository pedidos, OfertaEntregaRepository ofertas,
-            CodigoVerificacaoEmailRepository emails, CodigoVerificacaoRepository sms, Environment env) {
+            CodigoVerificacaoEmailRepository emails, CodigoVerificacaoRepository sms,
+            MotoboyIntegrationRateLimit rateLimit, Environment env) {
         if (!"127.0.0.1".equals(env.getProperty("server.address")) ||
                 !env.getProperty("spring.datasource.url", "").startsWith("jdbc:h2:mem:")) {
             throw new IllegalStateException("Fixtures de integração exigem H2 em memória e loopback.");
@@ -43,6 +45,7 @@ public class MotoboyScenarioController {
         this.fixture = fixture; this.usuarios = usuarios; this.entregadores = entregadores;
         this.lojas = lojas; this.pedidos = pedidos; this.ofertas = ofertas;
         this.emails = emails; this.sms = sms;
+        this.rateLimit = rateLimit;
     }
 
     @PostMapping("/cenarios/{id}")
@@ -50,6 +53,7 @@ public class MotoboyScenarioController {
     public Map<String,Object> criar(@PathVariable String id) {
         if (!id.matches("[a-z0-9-]{1,24}") || usuarios.existsById("it-" + id + "-a"))
             throw new IllegalArgumentException("Cenário deve ser novo e identificado por até 24 caracteres.");
+        rateLimit.iniciarCenario();
         var a = fixture.usuario(id + "-a", Papel.CLIENTE);
         var b = fixture.usuario(id + "-b", Papel.CLIENTE);
         var cliente = fixture.usuario(id + "-cliente", Papel.CLIENTE);
@@ -123,10 +127,12 @@ public class MotoboyScenarioController {
     @GetMapping("/codigo")
     @Transactional
     public Map<String,String> codigo(@RequestParam(required=false) String email,
-            @RequestParam(required=false) String telefone) {
+            @RequestParam(required=false) String telefone,
+            @RequestParam(defaultValue = "CADASTRO") CodigoVerificacaoEmail.TipoCodigo tipo) {
         if ((email == null) == (telefone == null)) throw new IllegalArgumentException("Informe uma identidade.");
         if (email != null) return Map.of("codigo", emails
-                .findTopByEmailAndUtilizadoFalseAndDataExpiracaoAfterOrderByCriadoEmDesc(email, LocalDateTime.now())
+                .findTopByEmailAndTipoAndUtilizadoFalseAndDataExpiracaoAfterOrderByCriadoEmDesc(
+                        email, tipo, LocalDateTime.now())
                 .orElseThrow().getCodigo());
         return Map.of("codigo", sms
                 .findTopByTelefoneAndUtilizadoFalseAndDataExpiracaoAfterOrderByCriadoEmDesc(telefone, LocalDateTime.now())

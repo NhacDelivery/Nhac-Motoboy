@@ -1,6 +1,7 @@
 import 'suporte_entrega_page.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -157,6 +158,98 @@ class RotaEntregaPage extends StatelessWidget {
     if (accepted != true || !context.mounted) return;
     await p.confirmarColeta();
     if (!context.mounted) return;
+  }
+
+  Future<void> _ligar(BuildContext context, String telefone) async {
+    final numero = telefone.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (!RegExp(r'^\+?[0-9]{8,15}$').hasMatch(numero)) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Telefone indisponível.')));
+      return;
+    }
+    try {
+      if (await launchUrl(
+        Uri(scheme: 'tel', path: numero),
+        mode: LaunchMode.externalApplication,
+      )) {
+        return;
+      }
+    } catch (_) {
+      // Falha ao abrir o discador: disponibiliza o número para ligação manual.
+    }
+    var mensagem = 'Não foi possível abrir o discador.';
+    try {
+      await Clipboard.setData(ClipboardData(text: numero));
+      mensagem += ' Número copiado.';
+    } catch (_) {
+      mensagem += ' Telefone: $numero.';
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(mensagem)));
+    }
+  }
+
+  Future<void> _desistir(
+    BuildContext context,
+    EntregaProvider provider,
+    String pedidoId,
+  ) async {
+    final form = GlobalKey<FormState>();
+    var texto = '';
+    final motivo = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancelar esta corrida?'),
+        content: SingleChildScrollView(
+          child: Form(
+            key: form,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'A justificativa aparecerá no pedido para o cliente e a loja. '
+                  'Você ficará offline ao cancelar.',
+                ),
+                TextFormField(
+                  decoration: const InputDecoration(labelText: 'Justificativa'),
+                  maxLength: 500,
+                  maxLines: 3,
+                  onChanged: (valor) => texto = valor.trim(),
+                  validator: (_) => texto.length < 5
+                      ? 'Informe pelo menos 5 caracteres.'
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Voltar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (form.currentState!.validate()) {
+                Navigator.pop(dialogContext, texto);
+              }
+            },
+            child: const Text('Cancelar corrida'),
+          ),
+        ],
+      ),
+    );
+    if (motivo == null || !context.mounted) return;
+    final ok = await provider.desistirEntregaAtual(pedidoId, motivo);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(provider.erro ?? 'A corrida mudou. Atualize a tela.'),
+        ),
+      );
+    }
   }
 
   @override
@@ -418,7 +511,22 @@ class RotaEntregaPage extends StatelessWidget {
                             }
                           },
                         ),
-                        if (active.clienteTelefone?.isNotEmpty == true) ...[
+                        if (!p.entregaColetada &&
+                            active.lojaTelefone?.trim().isNotEmpty == true) ...[
+                          SizedBox(height: 10.h),
+                          BotaoLargoNhac(
+                            texto: 'Ligar para a loja',
+                            isSecundario: true,
+                            icone: const Icon(
+                              Icons.phone_outlined,
+                              color: AppColors.texto,
+                            ),
+                            onPressed: () =>
+                                _ligar(context, active.lojaTelefone!),
+                          ),
+                        ],
+                        if (active.clienteTelefone?.trim().isNotEmpty ==
+                            true) ...[
                           SizedBox(height: 10.h),
                           BotaoLargoNhac(
                             texto: 'Ligar para o cliente',
@@ -427,30 +535,8 @@ class RotaEntregaPage extends StatelessWidget {
                               Icons.phone_outlined,
                               color: AppColors.texto,
                             ),
-                            onPressed: () async {
-                              final numero = active.clienteTelefone!.replaceAll(
-                                RegExp(r'[^0-9+]'),
-                                '',
-                              );
-                              try {
-                                if (numero.isEmpty ||
-                                    !await launchUrl(
-                                      Uri(scheme: 'tel', path: numero),
-                                    )) {
-                                  throw StateError('Telefone indisponível.');
-                                }
-                              } catch (_) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Não foi possível abrir o telefone.',
-                                      ),
-                                    ),
-                                  );
-                                }
-                              }
-                            },
+                            onPressed: () =>
+                                _ligar(context, active.clienteTelefone!),
                           ),
                         ],
                         if (active.lojaId != null) ...[
@@ -475,6 +561,13 @@ class RotaEntregaPage extends StatelessWidget {
                             ),
                           ),
                         ],
+                        if (!p.entregaColetada)
+                          TextButton(
+                            onPressed: p.podeColetar
+                                ? () => _desistir(context, p, active.pedidoId)
+                                : null,
+                            child: const Text('Cancelar corrida'),
+                          ),
                         TextButton.icon(
                           onPressed: () => Navigator.push(
                             context,
@@ -484,8 +577,10 @@ class RotaEntregaPage extends StatelessWidget {
                             ),
                           ),
                           icon: const Icon(Icons.help_outline),
-                          label: const Text(
-                            'Não consigo realizar esta corrida',
+                          label: Text(
+                            p.entregaColetada
+                                ? 'Solicitar cancelamento ao suporte'
+                                : 'Não consigo realizar esta corrida',
                           ),
                         ),
                         SizedBox(height: 20.h),

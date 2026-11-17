@@ -5,6 +5,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:uuid/uuid.dart';
 
 import '../models/entrega_ativa_model.dart';
 import '../models/oferta_entrega_model.dart';
@@ -37,6 +38,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
   EntregadorCadastroModel? _perfil;
   EntregaAtivaModel? _entrega;
+  ({String pedidoId, String descricao, String id})? _desistenciaPendente;
   RotaModel? _rota;
   final List<OfertaEntregaModel> _ofertas = [];
   final List<({DateTime hora, String texto})> _avisosRecentes = [];
@@ -137,6 +139,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     _stop();
     _perfil = null;
     _entrega = null;
+    _desistenciaPendente = null;
     _rota = null;
     ofertaSelecionadaId = null;
     _ofertas.clear();
@@ -516,8 +519,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
         },
         onError: (Object error) {
           if (!_valid(epoch)) return;
-          erroLocalizacao =
-              'Não foi possível acompanhar o GPS. Abra o app e atualize sua localização.';
+          erroLocalizacao = 'Não foi possível acompanhar o GPS. Abra o app e atualize sua localização.';
           _notify();
         },
       );
@@ -593,8 +595,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
     };
     void disconnected() {
       if (!_foreground || !_valid(connectionEpoch)) return;
-      avisoConexao =
-          'Atualizações em tempo real indisponíveis. As corridas continuam sendo consultadas automaticamente.';
+      avisoConexao = 'Atualizações em tempo real indisponíveis. As corridas continuam sendo consultadas automaticamente.';
       // Recalcula o intervalo de recuperação sem esperar o próximo polling.
       _start();
       _notify();
@@ -668,8 +669,7 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
       onError: (e) {
         if (e is ApiException && [400, 404, 409, 422].contains(e.status)) {
           _ofertas.removeWhere((o) => o.id == id);
-          aviso =
-              'Esta oferta não está mais disponível. Ela pode ter expirado ou sido aceita por outro entregador.';
+          aviso = 'Esta oferta não está mais disponível. Ela pode ter expirado ou sido aceita por outro entregador.';
         }
       },
     );
@@ -759,6 +759,35 @@ class EntregaProvider extends ChangeNotifier with WidgetsBindingObserver {
         _routeRequestedFor = null;
         await carregarRota(id, tentarNovamente: true);
       }
+    });
+  }
+
+  Future<bool> desistirEntregaAtual(
+    String pedidoId,
+    String justificativa,
+  ) async {
+    if (!podeColetar || _entrega?.pedidoId != pedidoId) return false;
+    final descricao = justificativa.trim();
+    if (descricao.length < 5 || descricao.length > 500) return false;
+
+    final pendente = _desistenciaPendente;
+    final id =
+        pendente?.pedidoId == pedidoId && pendente?.descricao == descricao
+        ? pendente!.id
+        : const Uuid().v4();
+    _desistenciaPendente = (pedidoId: pedidoId, descricao: descricao, id: id);
+
+    return _action(() async {
+      final epoch = _epoch;
+      await _service.desistirEntrega(pedidoId, id: id, descricao: descricao);
+      if (!_valid(epoch)) return;
+      _desistenciaPendente = null;
+      _entrega = null;
+      _rota = null;
+      _routeRequestedFor = null;
+      _status = StatusOperacional.offline;
+      _stop();
+      aviso = 'Corrida cancelada. A justificativa está disponível no pedido.';
     });
   }
 

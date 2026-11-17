@@ -207,6 +207,18 @@ class EntregadorService {
           '/api/v1/entregas/${Uri.encodeComponent(id)}/coletar',
         ),
       );
+  Future<void> desistirEntrega(
+    String pedidoId, {
+    required String id,
+    required String descricao,
+  }) async {
+    await api.request(
+      'POST',
+      '/api/v1/entregas/${Uri.encodeComponent(pedidoId)}/desistir',
+      body: {'id': id, 'descricao': descricao},
+    );
+  }
+
   Future<void> concluirEntrega(String id, {required String codigo}) async {
     if (!RegExp(r'^\d{4}$').hasMatch(codigo.trim())) {
       throw ArgumentError('Informe os quatro números do código de entrega.');
