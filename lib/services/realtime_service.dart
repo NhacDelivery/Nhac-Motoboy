@@ -20,7 +20,9 @@ class RealtimeService {
     // atualizado antes de cada tentativa, inclusive nas reconexões automáticas.
     final connectHeaders = <String, String>{};
 
-    _client = StompClient(
+    late final StompClient client;
+    bool conexaoAtual() => identical(_client, client);
+    client = StompClient(
       config: StompConfig(
         url: ApiConfig.wsUrl,
         stompConnectHeaders: connectHeaders,
@@ -39,23 +41,37 @@ class RealtimeService {
         heartbeatOutgoing: const Duration(seconds: 20),
         pingInterval: const Duration(seconds: 25),
         onConnect: (_) {
+          if (!conexaoAtual()) return;
           _subscriptions.clear();
           for (final topic in _listeners.keys) {
             _subscribe(topic);
           }
           onConnected?.call();
         },
-        onWebSocketDone: () => onDisconnected?.call(),
-        onDisconnect: (_) => onDisconnected?.call(),
-        onStompError: (frame) => onError?.call(
-          frame.body ?? 'O servidor recusou a conexão em tempo real.',
-        ),
-        onWebSocketError: (_) => onError?.call(
-          'Falha na conexão em tempo real. Tentando reconectar.',
-        ),
+        onWebSocketDone: () {
+          if (conexaoAtual()) onDisconnected?.call();
+        },
+        onDisconnect: (_) {
+          if (conexaoAtual()) onDisconnected?.call();
+        },
+        onStompError: (frame) {
+          if (conexaoAtual()) {
+            onError?.call(
+              frame.body ?? 'O servidor recusou a conexão em tempo real.',
+            );
+          }
+        },
+        onWebSocketError: (_) {
+          if (conexaoAtual()) {
+            onError?.call(
+              'Falha na conexão em tempo real. Tentando reconectar.',
+            );
+          }
+        },
       ),
     );
-    _client!.activate();
+    _client = client;
+    client.activate();
   }
 
   void listen(String topic, void Function(String) callback) {
@@ -64,10 +80,13 @@ class RealtimeService {
   }
 
   void _subscribe(String topic) {
-    _subscriptions[topic] = _client!.subscribe(
+    final client = _client!;
+    _subscriptions[topic] = client.subscribe(
       destination: topic,
       callback: (frame) {
-        if (frame.body != null) _listeners[topic]?.call(frame.body!);
+        if (identical(_client, client) && frame.body != null) {
+          _listeners[topic]?.call(frame.body!);
+        }
       },
     );
   }
@@ -84,9 +103,10 @@ class RealtimeService {
   }
 
   void disconnect() {
-    _client?.deactivate();
+    final client = _client;
     _client = null;
     _subscriptions.clear();
+    client?.deactivate();
   }
 
   void reconnect() {
