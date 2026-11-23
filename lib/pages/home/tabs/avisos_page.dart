@@ -9,7 +9,11 @@ import '../../chat_page.dart';
 
 void abrirAviso(BuildContext context, Map<String, dynamic> aviso) {
   if (!PushService.pertenceConta(aviso)) return;
-  if (aviso['tipo'] == 'MENSAGEM' && aviso['lojaId'] != null) {
+  if (aviso['tipo'] == 'MENSAGEM' && aviso['pedidoId'] != null && aviso['lojaId'] == null) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => ChatPage.entrega(
+      pedidoId: aviso['pedidoId'].toString(), clienteNome: 'Cliente da entrega',
+    )));
+  } else if (aviso['tipo'] == 'MENSAGEM' && aviso['lojaId'] != null) {
     Navigator.push(
       context,
       MaterialPageRoute(

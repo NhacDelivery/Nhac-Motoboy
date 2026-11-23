@@ -7,8 +7,11 @@ import '../controllers/user_provider.dart';
 import '../globals/theme_colors.dart';
 
 class ChatPage extends StatefulWidget {
+  final String? pedidoId;
   final String lojaId, lojaNome;
-  const ChatPage({super.key, required this.lojaId, required this.lojaNome});
+  const ChatPage({super.key, required this.lojaId, required this.lojaNome}) : pedidoId = null;
+  const ChatPage.entrega({super.key, required this.pedidoId, required String clienteNome})
+      : lojaId = '', lojaNome = clienteNome;
   @override
   State<ChatPage> createState() => _ChatPageState();
 }
@@ -20,7 +23,7 @@ class _ChatPageState extends State<ChatPage> {
   String? _submitted;
   int _messageCount = 0;
   Future<void> _abrir() async {
-    await _provider.abrir(widget.lojaId);
+    await _provider.abrir(widget.pedidoId ?? widget.lojaId, entrega: widget.pedidoId != null);
     if (!mounted) return;
     if (_provider.textoPendente != null) {
       _submitted = _provider.textoPendente;
@@ -119,7 +122,7 @@ class _ChatPageState extends State<ChatPage> {
                 ),
               if (p.erro != null)
                 TextButton(
-                  onPressed: () => p.tentarNovamente(widget.lojaId),
+                  onPressed: () => p.tentarNovamente(widget.pedidoId ?? widget.lojaId, entrega: widget.pedidoId != null),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.primaria,
                   ),
@@ -134,7 +137,7 @@ class _ChatPageState extends State<ChatPage> {
                 child: p.mensagens.isEmpty
                     ? Center(
                         child: Text(
-                          'Nenhuma mensagem. Converse com a loja sobre sua corrida.',
+                          widget.pedidoId == null ? 'Nenhuma mensagem. Converse com a loja sobre sua corrida.' : 'Converse com o cliente sobre a entrega.',
                           textAlign: TextAlign.center,
                           style: AppTextStyles.subtitulo(),
                         ),

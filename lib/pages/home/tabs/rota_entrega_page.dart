@@ -525,6 +525,15 @@ class RotaEntregaPage extends StatelessWidget {
                                 _ligar(context, active.lojaTelefone!),
                           ),
                         ],
+                        SizedBox(height: 10.h),
+                        BotaoLargoNhac(
+                          texto: 'Conversar com o cliente',
+                          isSecundario: true,
+                          icone: const Icon(Icons.chat_bubble_outline, color: AppColors.texto),
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => ChatPage.entrega(pedidoId: active.pedidoId, clienteNome: active.clienteNome),
+                          )),
+                        ),
                         if (active.clienteTelefone?.trim().isNotEmpty ==
                             true) ...[
                           SizedBox(height: 10.h),
