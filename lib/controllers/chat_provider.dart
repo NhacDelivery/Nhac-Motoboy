@@ -86,7 +86,7 @@ class ChatProvider extends ChangeNotifier {
     _notify();
   }
 
-  Future<void> abrir(String loja) async {
+  Future<void> abrir(String loja, {bool entrega = false}) async {
     final generation = ++_generation;
     conversaId = null;
     _timeout?.cancel();
@@ -106,7 +106,7 @@ class ChatProvider extends ChangeNotifier {
     erro = null;
     _notify();
     try {
-      final id = await service.abrir(loja);
+      final id = entrega ? await service.abrirEntrega(loja) : await service.abrir(loja);
       if (_disposed || generation != _generation) return;
       conversaId = id;
       _pendingKey = ApiConfig.usuarioId == null
@@ -243,9 +243,9 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> tentarNovamente(String loja) async {
+  Future<void> tentarNovamente(String loja, {bool entrega = false}) async {
     if (conversaId == null) {
-      await abrir(loja);
+      await abrir(loja, entrega: entrega);
       return;
     }
     realtime.reconnect();

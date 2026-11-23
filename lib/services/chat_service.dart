@@ -5,6 +5,8 @@ class ChatService {
   ChatService({ApiClient? api}) : api = api ?? ApiClient();
   Future<String> abrir(String lojaId) async =>
     (await api.request('POST', '/api/v1/entregador/conversas/lojas/${Uri.encodeComponent(lojaId)}'))['id'] as String;
+  Future<String> abrirEntrega(String pedidoId) async =>
+    (await api.request('POST', '/api/v1/entregador/conversas/entregas/${Uri.encodeComponent(pedidoId)}'))['id'] as String;
   Future<({List<MensagemModel> mensagens, bool last})> historico(String id, int page) async {
     final data = await api.request('GET', '/api/v1/entregador/conversas/${Uri.encodeComponent(id)}/mensagens',
       query: {'page': '$page', 'size': '30'});
