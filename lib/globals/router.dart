@@ -12,6 +12,7 @@ import '../pages/bem_vindo_motoca.dart';
 import '../pages/cadastro_motoboy_page.dart';
 import '../pages/email_motoca.dart';
 import '../pages/home/home_motoca_page.dart';
+import '../pages/splash_screen.dart';
 import '../pages/home/tabs/profile/editar_email_page.dart';
 import '../pages/home/tabs/profile/editar_foto_page.dart';
 import '../pages/home/tabs/profile/editar_veiculo_page.dart';
@@ -26,11 +27,15 @@ import '../pages/home/tabs/confirmar_entrega_page.dart';
 import '../pages/home/tabs/avaliacoes_page.dart';
 
 final GoRouter appRouter = GoRouter(
-  initialLocation: '/',
+  initialLocation: '/splash',
   refreshListenable: ApiConfig.session,
   redirect: (context, state) {
+    if (state.matchedLocation == '/splash') return null;
+
     const public = {
       '/',
+      '/splash',
+      '/bem-vindo-motoca',
       '/email-motoca',
       '/continuar-senha',
       '/criar-conta-codigo',
@@ -53,7 +58,9 @@ final GoRouter appRouter = GoRouter(
     ),
   ),
   routes: [
+    GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
     GoRoute(path: '/', builder: (_, _) => const BemVindoMotoca()),
+    GoRoute(path: '/bem-vindo-motoca', redirect: (_, _) => '/'),
     GoRoute(path: '/email-motoca', builder: (_, _) => const EmailMotocaPage()),
     GoRoute(
       path: '/continuar-senha',
