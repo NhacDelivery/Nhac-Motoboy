@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   integration:
@@ -58,6 +58,7 @@ jobs:
           path: app/integration-logs/
           if-no-files-found: error
           retention-days: 7
+
   test:
     name: Analyze, Test & Web
     timeout-minutes: 20
@@ -153,7 +154,6 @@ jobs:
           --dart-define=FIREBASE_APP_ID="$FIREBASE_APP_ID"
           --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID"
           --dart-define=FIREBASE_MESSAGING_SENDER_ID="$FIREBASE_MESSAGING_SENDER_ID"
-
       - name: Certificado público do APK Android
         run: |
           sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
@@ -178,6 +178,63 @@ jobs:
           echo "### APK Android de teste" >> "$GITHUB_STEP_SUMMARY"
           echo "Baixe **nhac-motoboy-debug-${{ github.run_number }}** em Artifacts desta execução e extraia app-debug.apk." >> "$GITHUB_STEP_SUMMARY"
           echo "Backend: https://backend-nhac.cloud.run. Assinatura de desenvolvimento; não é uma release de produção." >> "$GITHUB_STEP_SUMMARY"
+
+  release-apk:
+    name: Build & Release APK (Main)
+    needs: [test, integration]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID || '261563193700-snhkp8paeqme3ilopc22unio3b1g7a3o.apps.googleusercontent.com' }}
+      FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+      FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
+      FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+      FIREBASE_MESSAGING_SENDER_ID: ${{ vars.FIREBASE_MESSAGING_SENDER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.6'
+          cache: true
+      - uses: gradle/actions/setup-gradle@v4
+      - run: flutter config --jdk-dir="$JAVA_HOME_17_X64"
+      - run: flutter pub get
+
+      - name: Extrair versão do pubspec.yaml
+        id: version
+        run: |
+          APP_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //g' | cut -d'+' -f1 | tr -d ' ')
+          TAG="v${APP_VERSION}-build.${{ github.run_number }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "apk_name=nhac-motoboy-${TAG}.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Build APK Release
+        run: >-
+          flutter build apk --release
+          --build-number=${{ github.run_number }}
+          --dart-define=API_BASE_URL=https://backend-nhac.cloud.run
+          --dart-define=GOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID"
+          --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY"
+          --dart-define=FIREBASE_APP_ID="$FIREBASE_APP_ID"
+          --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID"
+          --dart-define=FIREBASE_MESSAGING_SENDER_ID="$FIREBASE_MESSAGING_SENDER_ID"
+
+      - name: Renomear APK para Release
+        run: cp build/app/outputs/flutter-apk/app-release.apk "${{ steps.version.outputs.apk_name }}"
+
+      - name: Publicar GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "Release ${{ steps.version.outputs.tag }}"
+          generate_release_notes: true
+          files: ${{ steps.version.outputs.apk_name }}
 
   device:
     name: Aplicativo completo em emulador Android
